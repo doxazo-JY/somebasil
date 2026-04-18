@@ -52,13 +52,39 @@
 - 컴포넌트명은 PascalCase 영어
 - 파일명은 kebab-case 영어
 
-## 데이터 구조 (Supabase 테이블)
-- monthly_summary: 월별 수입/지출/순이익
-- monthly_expenses: 월별 지출 항목 명세
-- staff_salary: 직원별 월별 인건비
-- daily_sales: 일별 카테고리별 매출 (POS)
-- staff: 직원 정보 (이름/직책/입사일/퇴사일/시급/상태)
-- memos: 월별 메모
+## 데이터베이스 스키마 (Supabase)
+
+### monthly_summary — 월별 요약
+- id, year, month, income, total_expense, profit(자동계산), created_at
+- UNIQUE (year, month)
+
+### monthly_expenses — 월별 지출 항목 명세
+- id, year, month, category, item, amount, created_at
+- category: 'ingredients'(재료비) | 'labor'(인건비) | 'fixed'(고정비) | 'card'(카드대금)
+
+### staff — 직원 정보
+- id, name, role, hire_date, leave_date, hourly_pay, is_active, created_at
+- role: 'manager'(점장) | 'assistant'(매니저) | 'part_time'(알바생)
+
+### staff_salary — 직원별 월별 인건비
+- id, staff_id(→staff), year, month, amount, created_at
+- UNIQUE (staff_id, year, month)
+
+### daily_sales — 일별 카테고리별 매출 (POS)
+- id, date, category, amount, created_at
+- category: 'coffee' | 'matcha' | 'beverage' | 'dessert' 등
+- UNIQUE (date, category)
+
+### memos — 월별 메모
+- id, year, month, content, created_at, updated_at
+- UNIQUE (year, month)
+
+### upload_history — 업로드 히스토리
+- id, file_name, file_type, status, uploaded_at
+- file_type: 'daily_sales' | 'monthly' | 'image'
+
+### parsing_rules — 이미지 파싱 규칙
+- id, keyword, category, created_at
 
 ## 직원 직책
 점장 / 매니저 / 알바생 (드롭다운 선택)
