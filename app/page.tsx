@@ -1,4 +1,4 @@
-import StatCard from '@/components/dashboard/StatCard'
+import StatCard from '@/components/ui/StatCard'
 import TrendChart from '@/components/dashboard/TrendChart'
 import ExpenseDonut from '@/components/dashboard/ExpenseDonut'
 import CategorySales from '@/components/dashboard/CategorySales'
