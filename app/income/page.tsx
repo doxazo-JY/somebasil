@@ -32,6 +32,13 @@ export default async function IncomePage({ searchParams }: PageProps) {
 
   const topCategory = categorySales[0]?.category ?? null
 
+  // 연간 누적 수입
+  const cumIncome = trend.reduce((s, d) => s + d.income, 0)
+
+  function formatManwon(v: number) {
+    return `${Math.round(v / 10000)}만`
+  }
+
   return (
     <div className="px-16 py-8 w-full">
       {/* 헤더 */}
@@ -44,12 +51,21 @@ export default async function IncomePage({ searchParams }: PageProps) {
       </div>
 
       {/* 요약 카드 */}
-      <div className="mb-6">
+      <div className="mb-4">
         <IncomeStatCards
           income={income}
           prevIncome={prevIncome}
           topCategory={topCategory}
         />
+      </div>
+
+      {/* 연간 누적 */}
+      <div className="bg-gray-50 rounded-xl border border-gray-100 px-6 py-3 mb-6 flex gap-8 text-sm">
+        <span className="text-gray-400">{year}년 누적</span>
+        <span>
+          수입 <strong className="text-gray-800">{formatManwon(cumIncome)}</strong>
+        </span>
+        <span className="text-gray-400 text-xs self-center">({year}년 1~12월 합계)</span>
       </div>
 
       {/* 월별 추이 라인차트 */}

@@ -59,6 +59,27 @@ function classifyRow(memo: string, counterpart: string, isIncome: boolean): {
   return { category: 'card', type: 'expense' }
 }
 
+// 콤마 포함 문자열 숫자 파싱
+function parseAmount(val: unknown): number | null {
+  if (val == null || val === '') return null
+  const str = String(val).replace(/,/g, '').trim()
+  const num = Number(str)
+  return isNaN(num) || str === '' ? null : num
+}
+
+// Excel 날짜 값 → YYYY-MM-DD 변환
+function parseDateCell(val: unknown): string {
+  if (val instanceof Date) {
+    const y = val.getFullYear()
+    const m = String(val.getMonth() + 1).padStart(2, '0')
+    const d = String(val.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  // 문자열: "2026-04-17 12:34:00" 또는 "2026-04-17" 형태
+  const str = String(val ?? '')
+  return str.slice(0, 10)
+}
+
 export async function POST(req: NextRequest) {
   const formData = await req.formData()
   const file = formData.get('file') as File | null
@@ -68,7 +89,8 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array' })
+  // cellDates: true → Excel 날짜 시리얼을 JS Date로 자동 변환
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
 
   // sheet_to_json으로 전체 읽기 (header: 1 → 배열 형태)
@@ -83,15 +105,13 @@ export async function POST(req: NextRequest) {
   for (const row of dataRows) {
     if (!row || !row[0]) continue // 빈 행 스킵
 
-    const datetime = String(row[0] ?? '')
-    const date = datetime.slice(0, 10) // YYYY-MM-DD 추출
+    const date = parseDateCell(row[0])
+    if (!date || date.length < 10) continue // 날짜 파싱 실패 시 스킵
+
     const memo = String(row[1] ?? '')
     const counterpart = String(row[2] ?? '')
-    const incomeVal = row[3]
-    const expenseVal = row[4]
-
-    const income = incomeVal != null && incomeVal !== '' ? Number(incomeVal) : null
-    const expense = expenseVal != null && expenseVal !== '' ? Number(expenseVal) : null
+    const income = parseAmount(row[3])
+    const expense = parseAmount(row[4])
 
     // 입금/출금 모두 없으면 스킵
     if (income === null && expense === null) continue

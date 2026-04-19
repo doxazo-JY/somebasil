@@ -62,6 +62,20 @@ export async function getWorkLogs(staffId: number, year: number, month: number) 
   return data ?? []
 }
 
+// 직원별 전체 급여 이력 (과거 인건비 표시용)
+export async function getStaffSalaryHistory(staffId: number) {
+  const supabase = createServerClient()
+  const { data, error } = await supabase
+    .from('staff_salary')
+    .select('year, month, amount')
+    .eq('staff_id', staffId)
+    .order('year', { ascending: false })
+    .order('month', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
 // 직원 추가
 export async function createStaff(staff: {
   name: string

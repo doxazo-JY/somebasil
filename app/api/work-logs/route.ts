@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 
+// 근무 시간 계산 (시간 단위, 소수점 2자리)
+function calcHours(start: string, end: string): number {
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  let mins = (eh * 60 + em) - (sh * 60 + sm)
+  if (mins < 0) mins += 24 * 60 // 자정 넘어가는 경우
+  return Math.round((mins / 60) * 100) / 100
+}
+
 // 출퇴근 기록 추가
 export async function POST(req: NextRequest) {
   const { staff_id, date, start_time, end_time } = await req.json()
   const supabase = createServerClient()
 
+  const hours_worked = calcHours(start_time, end_time)
+
   const { data, error } = await supabase
     .from('work_logs')
-    .insert({ staff_id, date, start_time, end_time })
+    .insert({ staff_id, date, start_time, end_time, hours_worked })
     .select()
     .single()
 
@@ -85,8 +96,6 @@ async function recalcMonthlySalary(
   }
 
   const grossPay = Math.round(basePay + weeklyAllowance)
-  const taxDeduction = Math.round(grossPay * (staff.tax_rate / 100))
-  const netPay = grossPay - taxDeduction
 
   // staff_salary upsert (세전 기준으로 저장)
   await supabase.from('staff_salary').upsert(
