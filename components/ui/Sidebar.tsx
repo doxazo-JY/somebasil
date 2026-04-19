@@ -5,12 +5,12 @@ import { usePathname } from 'next/navigation'
 
 const NAV_ITEMS = [
   { label: '대시보드', href: '/' },
-  { label: '수입', href: '/수입' },
-  { label: '지출', href: '/지출' },
-  { label: '이익', href: '/이익' },
-  { label: '직원', href: '/직원' },
-  { label: '업로드', href: '/업로드' },
-  { label: '설정', href: '/설정' },
+  { label: '수입', href: '/income' },
+  { label: '지출', href: '/expenses' },
+  { label: '이익', href: '/profit' },
+  { label: '직원', href: '/staff' },
+  { label: '업로드', href: '/upload' },
+  { label: '설정', href: '/settings' },
 ]
 
 export default function Sidebar() {

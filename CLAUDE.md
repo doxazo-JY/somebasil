@@ -66,9 +66,11 @@
 - id, name, role, hire_date, leave_date, hourly_pay, is_active, created_at
 - role: 'manager'(점장) | 'assistant'(매니저) | 'part_time'(알바생)
 
-### staff_salary — 직원별 월별 인건비
+### staff_salary — 직원별 월별 인건비 (계산 전용)
 - id, staff_id(→staff), year, month, amount, created_at
 - UNIQUE (staff_id, year, month)
+- ⚠️ 지출 집계에 사용하지 않음 — "이번 달 이 직원한테 얼마 줘야 하나" 계산 전용
+- 실제 인건비 지출은 통장 거래내역 업로드 시 monthly_expenses.labor로 기록됨
 
 ### daily_sales — 일별 카테고리별 매출 (POS)
 - id, date, category, amount, created_at
