@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation'
 
 const NAV_ITEMS = [
   { label: '대시보드', href: '/' },
+  { label: '주간현황', href: '/weekly' },
+  { label: '이익', href: '/profit' },
   { label: '수입', href: '/income' },
   { label: '지출', href: '/expenses' },
-  { label: '이익', href: '/profit' },
   { label: '직원', href: '/staff' },
   { label: '업로드', href: '/upload' },
   { label: '설정', href: '/settings' },

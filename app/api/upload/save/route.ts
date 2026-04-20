@@ -23,8 +23,26 @@ export async function POST(req: NextRequest) {
   if (type === 'bank_transaction') {
     const bankRows = rows as BankRow[]
 
-    // 수입 항목 → monthly_summary.income 누적
+    // 수입 항목 → daily_sales (날짜별 합산) + monthly_summary.income
     const incomeRows = bankRows.filter((r) => r.type === 'income')
+
+    // 날짜별 합산 → daily_sales upsert (category='income')
+    const incomeByDate: Record<string, number> = {}
+    for (const row of incomeRows) {
+      incomeByDate[row.date] = (incomeByDate[row.date] ?? 0) + (row.income ?? 0)
+    }
+    if (Object.keys(incomeByDate).length > 0) {
+      const dailySalesInserts = Object.entries(incomeByDate).map(([date, amount]) => ({
+        date,
+        category: 'income',
+        amount,
+      }))
+      await supabase
+        .from('daily_sales')
+        .upsert(dailySalesInserts, { onConflict: 'date,category' })
+    }
+
+    // 월별 합산 → monthly_summary.income
     const incomeByMonth: Record<string, number> = {}
     for (const row of incomeRows) {
       const [year, month] = row.date.split('-').map(Number)
@@ -36,7 +54,7 @@ export async function POST(req: NextRequest) {
       const [year, month] = key.split('-').map(Number)
       const { data: existing } = await supabase
         .from('monthly_summary')
-        .select('id, income')
+        .select('id')
         .eq('year', year)
         .eq('month', month)
         .single()
@@ -44,7 +62,7 @@ export async function POST(req: NextRequest) {
       if (existing) {
         await supabase
           .from('monthly_summary')
-          .update({ income: existing.income + totalIncome })
+          .update({ income: totalIncome })
           .eq('id', existing.id)
       } else {
         await supabase
@@ -53,11 +71,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 지출 항목 → monthly_expenses 삽입
+    // 지출 항목 → monthly_expenses 삽입 (date 포함)
     const expenseRows = bankRows.filter((r) => r.type === 'expense')
     const expenseInserts = expenseRows.map((row) => {
       const [year, month] = row.date.split('-').map(Number)
-      return { year, month, category: row.category, item: row.memo, amount: row.expense ?? 0 }
+      return { year, month, date: row.date, category: row.category, item: row.memo, amount: row.expense ?? 0 }
     })
 
     if (expenseInserts.length > 0) {
@@ -65,7 +83,7 @@ export async function POST(req: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // 월별로 지출 합산 → monthly_summary.total_expense 업데이트
+    // 월별 지출 합산 → monthly_summary.total_expense 업데이트
     const expenseByMonth: Record<string, number> = {}
     for (const row of expenseRows) {
       const [year, month] = row.date.split('-').map(Number)
@@ -77,7 +95,7 @@ export async function POST(req: NextRequest) {
       const [year, month] = key.split('-').map(Number)
       const { data: existing } = await supabase
         .from('monthly_summary')
-        .select('id, total_expense')
+        .select('id')
         .eq('year', year)
         .eq('month', month)
         .single()
@@ -85,7 +103,7 @@ export async function POST(req: NextRequest) {
       if (existing) {
         await supabase
           .from('monthly_summary')
-          .update({ total_expense: existing.total_expense + totalExpense })
+          .update({ total_expense: totalExpense })
           .eq('id', existing.id)
       } else {
         await supabase

@@ -2,7 +2,10 @@ import MonthFilter from '@/components/ui/MonthFilter'
 import ProfitStatCards from '@/components/profit/ProfitStatCards'
 import ProfitTrendChart from '@/components/profit/ProfitTrendChart'
 import MonthlyBreakdownTable from '@/components/profit/MonthlyBreakdownTable'
+import BreakEvenSection from '@/components/profit/BreakEvenSection'
+import DeficitBreakdown from '@/components/profit/DeficitBreakdown'
 import { getMonthlySummary, getYearlySummary } from '@/lib/supabase/queries/dashboard'
+import { getMonthlyExpensesByCategory } from '@/lib/supabase/queries/expenses'
 
 interface PageProps {
   searchParams: Promise<{ year?: string; month?: string }>
@@ -21,10 +24,11 @@ export default async function ProfitPage({ searchParams }: PageProps) {
   const prevMonth = month === 1 ? 12 : month - 1
   const prevYear = month === 1 ? year - 1 : year
 
-  const [current, prev, yearlySummary] = await Promise.all([
+  const [current, prev, yearlySummary, expensesByCategory] = await Promise.all([
     getMonthlySummary(year, month),
     getMonthlySummary(prevYear, prevMonth),
     getYearlySummary(year),
+    getMonthlyExpensesByCategory(year, month),
   ])
 
   const profit = current?.profit ?? 0
@@ -39,10 +43,10 @@ export default async function ProfitPage({ searchParams }: PageProps) {
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       {/* 헤더 */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">이익 분석</h1>
-          <p className="text-sm text-gray-400 mt-0.5">월별 손익 현황 및 추이</p>
+          <h1 className="text-xl font-bold text-gray-900">이익 — 흑자가 되려면?</h1>
+          <p className="text-sm text-gray-400 mt-0.5">손익분기 분석 · 적자 원인 · 개선 추이</p>
         </div>
         <MonthFilter year={year} month={month} />
       </div>
@@ -59,7 +63,7 @@ export default async function ProfitPage({ searchParams }: PageProps) {
       </div>
 
       {/* 연간 누적 */}
-      <div className="bg-gray-50 rounded-xl border border-gray-100 px-6 py-3 mb-6 flex gap-8 text-sm">
+      <div className="bg-gray-50 rounded-xl border border-gray-100 px-6 py-3 mb-6 flex flex-wrap gap-4 sm:gap-8 text-sm">
         <span className="text-gray-400">{year}년 누적</span>
         <span>매출 <strong className="text-gray-800">{formatManwon(cumIncome)}</strong></span>
         <span>지출 <strong className="text-gray-800">{formatManwon(cumExpense)}</strong></span>
@@ -76,8 +80,33 @@ export default async function ProfitPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      {/* 트렌드 차트 */}
+      {/* 손익분기 분석 + 비용 구조 분해 — 좌우 배치 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+            손익분기 분석
+          </p>
+          <BreakEvenSection income={income} expense={expense} profit={profit} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+            비용 구조 분해
+          </p>
+          <DeficitBreakdown
+            income={income}
+            labor={expensesByCategory.labor ?? 0}
+            ingredients={expensesByCategory.ingredients ?? 0}
+            fixed={expensesByCategory.fixed ?? 0}
+            card={expensesByCategory.card ?? 0}
+          />
+        </div>
+      </div>
+
+      {/* 개선 추이 차트 */}
       <div className="mb-6">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+          월별 개선 추이
+        </p>
         <ProfitTrendChart data={yearlySummary} selectedMonth={month} />
       </div>
 
