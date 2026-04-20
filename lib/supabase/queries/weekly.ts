@@ -36,10 +36,10 @@ export async function getWeeklySummary(weeks: number = 6): Promise<WeekData[]> {
 
   const sinceStr = toDateStr(since)
 
-  // 일별 매출 (daily_sales)
+  // 일별 매출 (daily_sales) — source 포함해서 POS 우선 처리
   const { data: salesData } = await supabase
     .from('daily_sales')
-    .select('date, amount')
+    .select('date, amount, source')
     .gte('date', sinceStr)
     .order('date')
 
@@ -51,13 +51,22 @@ export async function getWeeklySummary(weeks: number = 6): Promise<WeekData[]> {
     .not('date', 'is', null)
     .order('date')
 
-  // 주별로 그룹핑
+  // 날짜별로 pos/bank 분리 집계
+  const incomeByDate: Record<string, { pos: number; bank: number }> = {}
+  for (const row of salesData ?? []) {
+    if (!incomeByDate[row.date]) incomeByDate[row.date] = { pos: 0, bank: 0 }
+    if (row.source === 'pos') incomeByDate[row.date].pos += row.amount
+    else incomeByDate[row.date].bank += row.amount
+  }
+
+  // 주별로 그룹핑 (POS 우선)
   const incomeByWeek: Record<string, number> = {}
   const expenseByWeek: Record<string, number> = {}
 
-  for (const row of salesData ?? []) {
-    const ws = toDateStr(getWeekStart(new Date(row.date)))
-    incomeByWeek[ws] = (incomeByWeek[ws] ?? 0) + row.amount
+  for (const [date, amounts] of Object.entries(incomeByDate)) {
+    const ws = toDateStr(getWeekStart(new Date(date)))
+    const amount = amounts.pos > 0 ? amounts.pos : amounts.bank
+    incomeByWeek[ws] = (incomeByWeek[ws] ?? 0) + amount
   }
 
   for (const row of expenseData ?? []) {
@@ -81,11 +90,13 @@ export async function getWeeklySummary(weeks: number = 6): Promise<WeekData[]> {
 
     const m = weekStart.getMonth() + 1
     const d = weekStart.getDate()
+    const weekOfMonth = Math.ceil(d / 7)
+    const ordinal = ['첫째', '둘째', '셋째', '넷째', '다섯째'][weekOfMonth - 1] ?? `${weekOfMonth}번째`
 
     result.push({
       weekStart: wsStr,
       weekEnd: toDateStr(weekEnd),
-      label: `${m}/${d}주`,
+      label: `${m}월 ${ordinal} 주`,
       income,
       expense,
       profit: income - expense,

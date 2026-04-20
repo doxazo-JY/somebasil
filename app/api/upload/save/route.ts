@@ -14,19 +14,58 @@ export async function POST(req: NextRequest) {
 
   if (type === 'daily_sales') {
     const salesRows = rows as DailySalesRow[]
+    // POS 데이터 → source='pos' 태그
+    const rowsWithSource = salesRows.map((r) => ({ ...r, source: 'pos' }))
     const { error } = await supabase
       .from('daily_sales')
-      .upsert(salesRows, { onConflict: 'date,category' })
+      .upsert(rowsWithSource, { onConflict: 'date,category' })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // POS 업로드 시 monthly_summary.income도 갱신 (daily_sales 기준으로 재집계)
+    const monthsAffected = new Set(
+      salesRows.map((r) => {
+        const [year, month] = r.date.split('-').map(Number)
+        return `${year}-${month}`
+      })
+    )
+    for (const key of monthsAffected) {
+      const [year, month] = key.split('-').map(Number)
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+      const endMonth = month === 12 ? 1 : month + 1
+      const endYear = month === 12 ? year + 1 : year
+      const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
+
+      // POS 있는 날은 pos만, 없는 날은 bank 합산
+      const { data: allSales } = await supabase
+        .from('daily_sales')
+        .select('date, amount, source')
+        .gte('date', startDate)
+        .lt('date', endDate)
+
+      const totalIncome = calcIncomePreferPos(allSales ?? [])
+
+      const { data: existing } = await supabase
+        .from('monthly_summary')
+        .select('id')
+        .eq('year', year)
+        .eq('month', month)
+        .single()
+
+      if (existing) {
+        await supabase.from('monthly_summary').update({ income: totalIncome }).eq('id', existing.id)
+      } else {
+        await supabase.from('monthly_summary').insert({ year, month, income: totalIncome, total_expense: 0 })
+      }
+    }
   }
 
   if (type === 'bank_transaction') {
     const bankRows = rows as BankRow[]
 
-    // 수입 항목 → daily_sales (날짜별 합산) + monthly_summary.income
+    // 수입 항목 → daily_sales (source='bank') + monthly_summary.income
     const incomeRows = bankRows.filter((r) => r.type === 'income')
 
-    // 날짜별 합산 → daily_sales upsert (category='income')
+    // 날짜별 합산 → daily_sales upsert (category='income', source='bank')
     const incomeByDate: Record<string, number> = {}
     for (const row of incomeRows) {
       incomeByDate[row.date] = (incomeByDate[row.date] ?? 0) + (row.income ?? 0)
@@ -36,6 +75,7 @@ export async function POST(req: NextRequest) {
         date,
         category: 'income',
         amount,
+        source: 'bank',
       }))
       await supabase
         .from('daily_sales')
@@ -60,14 +100,9 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (existing) {
-        await supabase
-          .from('monthly_summary')
-          .update({ income: totalIncome })
-          .eq('id', existing.id)
+        await supabase.from('monthly_summary').update({ income: totalIncome }).eq('id', existing.id)
       } else {
-        await supabase
-          .from('monthly_summary')
-          .insert({ year, month, income: totalIncome, total_expense: 0 })
+        await supabase.from('monthly_summary').insert({ year, month, income: totalIncome, total_expense: 0 })
       }
     }
 
@@ -101,14 +136,9 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (existing) {
-        await supabase
-          .from('monthly_summary')
-          .update({ total_expense: totalExpense })
-          .eq('id', existing.id)
+        await supabase.from('monthly_summary').update({ total_expense: totalExpense }).eq('id', existing.id)
       } else {
-        await supabase
-          .from('monthly_summary')
-          .insert({ year, month, income: 0, total_expense: totalExpense })
+        await supabase.from('monthly_summary').insert({ year, month, income: 0, total_expense: totalExpense })
       }
     }
   }
@@ -121,4 +151,15 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json({ ok: true })
+}
+
+// POS 우선: 날짜에 pos 데이터 있으면 pos만, 없으면 bank 사용
+function calcIncomePreferPos(rows: { date: string; amount: number; source: string }[]): number {
+  const byDate: Record<string, { pos: number; bank: number }> = {}
+  for (const r of rows) {
+    if (!byDate[r.date]) byDate[r.date] = { pos: 0, bank: 0 }
+    if (r.source === 'pos') byDate[r.date].pos += r.amount
+    else byDate[r.date].bank += r.amount
+  }
+  return Object.values(byDate).reduce((sum, d) => sum + (d.pos > 0 ? d.pos : d.bank), 0)
 }
