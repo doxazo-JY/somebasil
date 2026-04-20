@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   const cumProfit = allTime.reduce((s, d) => s + d.profit, 0)
 
   return (
-    <div className="px-16 py-8 w-full">
+    <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       {/* 헤더 */}
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">대시보드</h1>
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
         {month}월 현황
       </p>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <StatCard
           label="월 매출"
           value={current ? formatManwon(current.income) : '—'}
@@ -97,8 +97,8 @@ export default async function DashboardPage() {
       </div>
 
       {/* 차트 영역 */}
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="md:col-span-2">
           <TrendChart data={yearlySummary} />
         </div>
         <ExpenseDonut data={expenses} />

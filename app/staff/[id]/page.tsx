@@ -38,9 +38,9 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   if (!staff) notFound()
 
   return (
-    <div className="px-16 py-8 w-full flex flex-col gap-6">
+    <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full flex flex-col gap-6">
       {/* 헤더 */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/staff" className="text-gray-400 hover:text-gray-600 text-sm">
             ← 직원 목록
@@ -67,7 +67,7 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <EditStaffButton staff={staff} />
           <MonthFilter year={year} month={month} />
         </div>

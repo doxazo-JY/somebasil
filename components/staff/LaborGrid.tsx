@@ -32,7 +32,7 @@ export default function LaborGrid({ staffList, salaries, year }: LaborGridProps)
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto w-full">
       <div className="px-6 py-4 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-700">인건비 현황 ({year}년)</p>
       </div>

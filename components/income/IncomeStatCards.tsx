@@ -26,7 +26,7 @@ export default function IncomeStatCards({ income, prevIncome, topCategory }: Inc
   const change = calcChange(income, prevIncome)
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <StatCard
         label="월 매출"
         value={income > 0 ? formatManwon(income) : '—'}

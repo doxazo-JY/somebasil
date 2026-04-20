@@ -20,7 +20,7 @@ export default async function UploadPage({ searchParams }: PageProps) {
   ])
 
   return (
-    <div className="px-16 py-8 w-full">
+    <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       {/* 헤더 */}
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">데이터 업로드</h1>

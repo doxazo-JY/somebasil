@@ -36,7 +36,7 @@ export default function MonthlyBreakdownTable({ data, selectedMonth, year }: Mon
   const totProfit = rows.reduce((s, r) => s + r.profit, 0)
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden overflow-x-auto">
       <div className="px-6 py-4 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-700">{year}년 월별 손익</p>
       </div>

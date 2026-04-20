@@ -16,7 +16,7 @@ export default async function StaffPage() {
   const inactiveStaff = staffList.filter((s) => !s.is_active)
 
   return (
-    <div className="px-16 py-8 w-full flex flex-col gap-6">
+    <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full flex flex-col gap-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>

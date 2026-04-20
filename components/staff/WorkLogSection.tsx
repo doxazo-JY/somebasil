@@ -50,7 +50,7 @@ export default function WorkLogSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: '총 근무시간', value: `${totalHours.toFixed(1)}h` },
           { label: '세전 급여', value: `${pay.gross.toLocaleString()}원` },

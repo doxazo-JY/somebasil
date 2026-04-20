@@ -33,7 +33,7 @@ export default function ProfitStatCards({
     : undefined
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <StatCard
         label="순이익"
         value={income > 0 || expense > 0 ? formatManwon(profit) : '—'}

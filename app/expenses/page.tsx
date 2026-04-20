@@ -41,7 +41,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="px-16 py-8 w-full">
+    <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       {/* 헤더 */}
       <div className="flex items-start justify-between mb-6">
         <div>

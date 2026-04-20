@@ -20,9 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${geist.variable} h-full antialiased`}>
-      <body className="h-full flex bg-gray-50">
+      <body className="h-full flex flex-col md:flex-row bg-gray-50">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">{children}</main>
       </body>
     </html>
   );
