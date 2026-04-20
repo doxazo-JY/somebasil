@@ -37,7 +37,7 @@ export default function ProfitTrendChart({ data, selectedMonth }: ProfitTrendCha
         <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
           <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-          <YAxis tickFormatter={formatManwon} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={44} />
+          <YAxis tickFormatter={formatManwon} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={56} />
           <Tooltip formatter={(value) => formatManwon(Number(value))} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
           <ReferenceLine y={0} stroke="#e5e7eb" strokeDasharray="4 4" />

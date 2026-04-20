@@ -41,7 +41,7 @@ export default function TrendChart({ data }: TrendChartProps) {
         <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
           <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-          <YAxis tickFormatter={formatManwon} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={40} />
+          <YAxis tickFormatter={formatManwon} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={56} />
           <Tooltip formatter={(value) => formatManwon(Number(value))} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
           <Line type="monotone" dataKey="수입" stroke="#1a5c3a" strokeWidth={2} dot={false} />

@@ -46,7 +46,7 @@ export default function ExpenseTrendChart({ data, selectedMonth }: ExpenseTrendC
             tick={{ fontSize: 11, fill: '#9ca3af' }}
             axisLine={false}
             tickLine={false}
-            width={40}
+            width={56}
           />
           <Tooltip formatter={(value) => `${Math.round(Number(value) / 10000)}만원`} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />

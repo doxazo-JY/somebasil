@@ -6,6 +6,7 @@ import MemoCard from '@/components/dashboard/MemoCard'
 import {
   getMonthlySummary,
   getYearlySummary,
+  getAllTimeSummary,
   getMonthlyExpensesByCategory,
   getMonthlySalesByCategory,
   getMemo,
@@ -28,19 +29,20 @@ export default async function DashboardPage() {
   const prevMonth = month === 1 ? 12 : month - 1
   const prevYear = month === 1 ? year - 1 : year
 
-  const [current, prev, yearlySummary, expenses, sales, memo] = await Promise.all([
+  const [current, prev, yearlySummary, allTime, expenses, sales, memo] = await Promise.all([
     getMonthlySummary(year, month),
     getMonthlySummary(prevYear, prevMonth),
     getYearlySummary(year),
+    getAllTimeSummary(),
     getMonthlyExpensesByCategory(year, month),
     getMonthlySalesByCategory(year, month),
     getMemo(year, month),
   ])
 
-  // 연간 누적
-  const cumIncome = yearlySummary.reduce((s, d) => s + d.income, 0)
-  const cumExpense = yearlySummary.reduce((s, d) => s + d.total_expense, 0)
-  const cumProfit = yearlySummary.reduce((s, d) => s + d.profit, 0)
+  // 전체 기간 누적
+  const cumIncome = allTime.reduce((s, d) => s + d.income, 0)
+  const cumExpense = allTime.reduce((s, d) => s + d.total_expense, 0)
+  const cumProfit = allTime.reduce((s, d) => s + d.profit, 0)
 
   return (
     <div className="px-16 py-8 w-full">
@@ -79,7 +81,7 @@ export default async function DashboardPage() {
 
       {/* 연간 누적 */}
       <div className="bg-gray-50 rounded-xl border border-gray-100 px-6 py-3 mb-6 flex gap-8 text-sm">
-        <span className="text-gray-400">누적</span>
+        <span className="text-gray-400">전체 누적</span>
         <span>
           매출 <strong className="text-gray-800">{formatManwon(cumIncome)}</strong>
         </span>

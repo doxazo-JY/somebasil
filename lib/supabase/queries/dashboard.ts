@@ -59,6 +59,17 @@ export async function getMonthlySalesByCategory(year: number, month: number) {
   return data ?? []
 }
 
+// 전체 기간 누적 합계 (연도 무관)
+export async function getAllTimeSummary() {
+  const supabase = createServerClient()
+  const { data, error } = await supabase
+    .from('monthly_summary')
+    .select('income, total_expense, profit')
+
+  if (error) throw error
+  return data ?? []
+}
+
 // 이번 달 메모
 export async function getMemo(year: number, month: number) {
   const supabase = createServerClient()
