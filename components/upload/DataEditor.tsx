@@ -7,14 +7,18 @@ const CATEGORY_OPTIONS = [
   { value: 'ingredients', label: '재료비' },
   { value: 'labor', label: '인건비' },
   { value: 'fixed', label: '고정비' },
+  { value: 'equipment', label: '설비투자' },
   { value: 'card', label: '카드대금' },
+  { value: 'excluded', label: '제외' },
 ]
 
 const CATEGORY_LABEL: Record<string, string> = {
   ingredients: '재료비',
   labor: '인건비',
   fixed: '고정비',
+  equipment: '설비투자',
   card: '카드대금',
+  excluded: '제외',
 }
 
 interface ExpenseRow {

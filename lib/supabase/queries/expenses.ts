@@ -1,6 +1,6 @@
 import { createServerClient } from '../server'
 
-// 월별 지출 카테고리별 합계
+// 월별 지출 카테고리별 합계 (excluded 제외)
 export async function getMonthlyExpensesByCategory(year: number, month: number) {
   const supabase = createServerClient()
   const { data, error } = await supabase
@@ -8,6 +8,7 @@ export async function getMonthlyExpensesByCategory(year: number, month: number) 
     .select('category, amount')
     .eq('year', year)
     .eq('month', month)
+    .neq('category', 'excluded')
 
   if (error) throw error
 
@@ -19,13 +20,14 @@ export async function getMonthlyExpensesByCategory(year: number, month: number) 
   return grouped // { ingredients: 000, labor: 000, fixed: 000, card: 000 }
 }
 
-// 연도별 월별 카테고리별 지출 추이 (라인차트용)
+// 연도별 월별 카테고리별 지출 추이 (라인차트용, excluded 제외)
 export async function getYearlyExpenseTrend(year: number) {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('monthly_expenses')
     .select('month, category, amount')
     .eq('year', year)
+    .neq('category', 'excluded')
     .order('month', { ascending: true })
 
   if (error) throw error
@@ -44,6 +46,7 @@ export async function getYearlyExpenseTrend(year: number) {
       ingredients: byMonth[m]?.ingredients ?? 0,
       labor: byMonth[m]?.labor ?? 0,
       fixed: byMonth[m]?.fixed ?? 0,
+      equipment: byMonth[m]?.equipment ?? 0,
       card: byMonth[m]?.card ?? 0,
     }
   }).filter((d) => Object.values(d).some((v, i) => i > 0 && v > 0)) // 데이터 있는 월만
@@ -64,7 +67,7 @@ export async function getMonthlyLaborDetail(year: number, month: number) {
   return data ?? []
 }
 
-// 월별 카테고리별 항목 상세 (고정비/재료비 breakdown용)
+// 월별 카테고리별 항목 상세 (고정비/재료비 breakdown용, excluded 제외)
 export async function getMonthlyExpenseItems(year: number, month: number) {
   const supabase = createServerClient()
   const { data, error } = await supabase
@@ -72,6 +75,7 @@ export async function getMonthlyExpenseItems(year: number, month: number) {
     .select('id, category, item, amount')
     .eq('year', year)
     .eq('month', month)
+    .neq('category', 'excluded')
     .order('amount', { ascending: false })
 
   if (error) throw error

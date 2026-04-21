@@ -97,6 +97,7 @@ export default async function ProfitPage({ searchParams }: PageProps) {
             labor={expensesByCategory.labor ?? 0}
             ingredients={expensesByCategory.ingredients ?? 0}
             fixed={expensesByCategory.fixed ?? 0}
+            equipment={expensesByCategory.equipment ?? 0}
             card={expensesByCategory.card ?? 0}
           />
         </div>

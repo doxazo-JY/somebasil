@@ -27,7 +27,7 @@ export async function getYearlySummary(year: number) {
   return data ?? []
 }
 
-// 월별 지출 카테고리 합계 (도넛 차트용)
+// 월별 지출 카테고리 합계 (도넛 차트용, excluded 제외)
 export async function getMonthlyExpensesByCategory(year: number, month: number) {
   const supabase = createServerClient()
   const { data, error } = await supabase
@@ -35,6 +35,7 @@ export async function getMonthlyExpensesByCategory(year: number, month: number) 
     .select('category, amount')
     .eq('year', year)
     .eq('month', month)
+    .neq('category', 'excluded')
 
   if (error) throw error
   return data ?? []

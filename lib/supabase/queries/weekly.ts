@@ -43,12 +43,13 @@ export async function getWeeklySummary(weeks: number = 6): Promise<WeekData[]> {
     .gte('date', sinceStr)
     .order('date')
 
-  // 지출 (monthly_expenses — date 컬럼 있는 것만)
+  // 지출 (monthly_expenses — date 컬럼 있는 것만, excluded 카테고리는 집계 제외)
   const { data: expenseData } = await supabase
     .from('monthly_expenses')
     .select('date, amount')
     .gte('date', sinceStr)
     .not('date', 'is', null)
+    .neq('category', 'excluded')
     .order('date')
 
   // 날짜별로 pos/bank 분리 집계

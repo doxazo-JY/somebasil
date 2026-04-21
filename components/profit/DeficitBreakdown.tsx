@@ -5,28 +5,31 @@ interface DeficitBreakdownProps {
   labor: number
   ingredients: number
   fixed: number
+  equipment: number
   card: number
 }
 
 const CATEGORY_INFO: Record<string, { label: string; color: string; bar: string; note: string }> = {
-  labor:       { label: '인건비',  color: 'text-violet-600', bar: 'bg-violet-400', note: '구조적 고정비' },
-  ingredients: { label: '재료비',  color: 'text-amber-600',  bar: 'bg-amber-400',  note: '프리미엄 원재료' },
-  fixed:       { label: '고정비',  color: 'text-blue-600',   bar: 'bg-blue-400',   note: '임대료 등' },
-  card:        { label: '기타',    color: 'text-gray-500',   bar: 'bg-gray-300',   note: '카드대금 등' },
+  labor:       { label: '인건비',   color: 'text-violet-600', bar: 'bg-violet-400', note: '구조적 고정비' },
+  ingredients: { label: '재료비',   color: 'text-amber-600',  bar: 'bg-amber-400',  note: '프리미엄 원재료' },
+  fixed:       { label: '고정비',   color: 'text-blue-600',   bar: 'bg-blue-400',   note: '임대료 등' },
+  equipment:   { label: '설비투자', color: 'text-sky-600',    bar: 'bg-sky-400',    note: '일회성 자본 지출' },
+  card:        { label: '기타',     color: 'text-gray-500',   bar: 'bg-gray-300',   note: '카드대금 등' },
 }
 
 function fmt(v: number) {
   return `${Math.round(Math.abs(v) / 10000)}만`
 }
 
-export default function DeficitBreakdown({ income, labor, ingredients, fixed, card }: DeficitBreakdownProps) {
+export default function DeficitBreakdown({ income, labor, ingredients, fixed, equipment, card }: DeficitBreakdownProps) {
   if (income === 0) return null
 
-  const totalExpense = labor + ingredients + fixed + card
+  const totalExpense = labor + ingredients + fixed + equipment + card
   const items = [
     { key: 'labor', amount: labor },
     { key: 'ingredients', amount: ingredients },
     { key: 'fixed', amount: fixed },
+    { key: 'equipment', amount: equipment },
     { key: 'card', amount: card },
   ].filter((i) => i.amount > 0).sort((a, b) => b.amount - a.amount)
 

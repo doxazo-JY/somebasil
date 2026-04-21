@@ -62,49 +62,8 @@ export async function POST(req: NextRequest) {
   if (type === 'bank_transaction') {
     const bankRows = rows as BankRow[]
 
-    // 수입 항목 → daily_sales (source='bank') + monthly_summary.income
-    const incomeRows = bankRows.filter((r) => r.type === 'income')
-
-    // 날짜별 합산 → daily_sales upsert (category='income', source='bank')
-    const incomeByDate: Record<string, number> = {}
-    for (const row of incomeRows) {
-      incomeByDate[row.date] = (incomeByDate[row.date] ?? 0) + (row.income ?? 0)
-    }
-    if (Object.keys(incomeByDate).length > 0) {
-      const dailySalesInserts = Object.entries(incomeByDate).map(([date, amount]) => ({
-        date,
-        category: 'income',
-        amount,
-        source: 'bank',
-      }))
-      await supabase
-        .from('daily_sales')
-        .upsert(dailySalesInserts, { onConflict: 'date,category' })
-    }
-
-    // 월별 합산 → monthly_summary.income
-    const incomeByMonth: Record<string, number> = {}
-    for (const row of incomeRows) {
-      const [year, month] = row.date.split('-').map(Number)
-      const key = `${year}-${month}`
-      incomeByMonth[key] = (incomeByMonth[key] ?? 0) + (row.income ?? 0)
-    }
-
-    for (const [key, totalIncome] of Object.entries(incomeByMonth)) {
-      const [year, month] = key.split('-').map(Number)
-      const { data: existing } = await supabase
-        .from('monthly_summary')
-        .select('id')
-        .eq('year', year)
-        .eq('month', month)
-        .single()
-
-      if (existing) {
-        await supabase.from('monthly_summary').update({ income: totalIncome }).eq('id', existing.id)
-      } else {
-        await supabase.from('monthly_summary').insert({ year, month, income: totalIncome, total_expense: 0 })
-      }
-    }
+    // 수입 = POS only 원칙: 통장 입금은 DB에 저장하지 않음
+    // (대여금/개인이체/선불충전 등이 섞여있고, 카드사 입금은 POS와 중복)
 
     // 지출 항목 → monthly_expenses 삽입 (date 포함)
     const expenseRows = bankRows.filter((r) => r.type === 'expense')
@@ -119,8 +78,10 @@ export async function POST(req: NextRequest) {
     }
 
     // 월별 지출 합산 → monthly_summary.total_expense 업데이트
+    // excluded 카테고리는 집계에서 제외 (박기선 개인 출금 등)
     const expenseByMonth: Record<string, number> = {}
     for (const row of expenseRows) {
+      if (row.category === 'excluded') continue
       const [year, month] = row.date.split('-').map(Number)
       const key = `${year}-${month}`
       expenseByMonth[key] = (expenseByMonth[key] ?? 0) + (row.expense ?? 0)
