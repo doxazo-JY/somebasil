@@ -14,6 +14,8 @@ import {
   getMonthlyAOV,
 } from '@/lib/supabase/queries/income'
 
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   searchParams: Promise<{ year?: string; month?: string }>
 }

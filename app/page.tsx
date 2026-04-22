@@ -17,6 +17,8 @@ import {
   getMonthlyProductSales,
 } from '@/lib/supabase/queries/income'
 
+export const dynamic = 'force-dynamic'
+
 function formatManwon(amount: number) {
   const man = Math.round(Math.abs(amount) / 10000)
   return `${amount < 0 ? '-' : ''}${man}만`

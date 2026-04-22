@@ -9,6 +9,8 @@ import { getYearlySummary } from '@/lib/supabase/queries/dashboard'
 import { getYearlyExpenseTrend } from '@/lib/supabase/queries/expenses'
 import { getYearlyAOVTrend } from '@/lib/supabase/queries/income'
 
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   searchParams: Promise<{ year?: string }>
 }

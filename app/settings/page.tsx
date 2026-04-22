@@ -5,6 +5,8 @@ import {
   getLoanBalanceByCounterpart,
 } from '@/lib/supabase/queries/loans'
 
+export const dynamic = 'force-dynamic'
+
 export default async function SettingsPage() {
   const [loans, balance, byCounterpart] = await Promise.all([
     getLoans(),

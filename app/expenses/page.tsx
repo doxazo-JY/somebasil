@@ -11,6 +11,8 @@ import {
 } from '@/lib/supabase/queries/expenses'
 import { getMonthlySummary } from '@/lib/supabase/queries/dashboard'
 
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   searchParams: Promise<{ year?: string; month?: string }>
 }

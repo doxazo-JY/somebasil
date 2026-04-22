@@ -13,6 +13,9 @@ import {
   getDeadMenus,
 } from '@/lib/supabase/queries/menu'
 
+// 배포 환경에서 캐시 회피 — 매 요청마다 최신 데이터 로드
+export const dynamic = 'force-dynamic'
+
 // KST 기준 오늘 → UTC 자정 Date
 function getKSTTodayUTC(): Date {
   const now = new Date()

@@ -9,6 +9,8 @@ import {
   getRecentWeekOptions,
 } from '@/lib/supabase/queries/weekly'
 
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   searchParams: Promise<{ week?: string }>
 }

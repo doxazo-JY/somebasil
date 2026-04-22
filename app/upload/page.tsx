@@ -2,6 +2,8 @@ import UploadSection from '@/components/upload/UploadSection'
 import UploadHistory from '@/components/upload/UploadHistory'
 import { getUploadHistory } from '@/lib/supabase/queries/upload'
 
+export const dynamic = 'force-dynamic'
+
 export default async function UploadPage() {
   const history = await getUploadHistory()
 
