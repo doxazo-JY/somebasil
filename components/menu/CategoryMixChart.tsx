@@ -141,12 +141,6 @@ export default function CategoryMixChart({
             iconSize={7}
             wrapperStyle={{ fontSize: 11 }}
             formatter={(v) => CATEGORY_LABEL[String(v)] ?? v}
-            payload={sortedCats.map((c) => ({
-              value: c,
-              type: 'circle',
-              color: CATEGORY_HEX[c] ?? '#c4c7cc',
-              id: c,
-            }))}
           />
           {sortedCats.map((c) => (
             <Area
