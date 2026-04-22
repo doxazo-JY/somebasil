@@ -38,9 +38,9 @@ export default function HotIceChart({ data }: HotIceChartProps) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
-      <div className="flex items-baseline justify-between mb-4">
-        <p className="text-sm font-semibold text-gray-700">HOT / ICE 비율 월별</p>
-        <p className="text-[11px] text-gray-400">음료만 (디저트/조정 제외)</p>
+      <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
+        <p className="text-sm font-semibold text-gray-700 whitespace-nowrap">HOT / ICE 비율 월별</p>
+        <p className="text-[11px] text-gray-400 [word-break:keep-all]">음료만 (디저트/조정 제외)</p>
       </div>
 
       <ResponsiveContainer width="100%" height={220}>

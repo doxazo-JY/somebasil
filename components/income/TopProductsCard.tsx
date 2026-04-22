@@ -45,8 +45,13 @@ export default function TopProductsCard({
   const prevRankMap = new Map<string, number>()
   prevProducts.forEach((p, i) => prevRankMap.set(p.product_name, i + 1))
 
+  function fmtAmount(v: number) {
+    if (v >= 10000) return `${Math.round(v / 10000)}만`
+    return `${v.toLocaleString()}원`
+  }
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
+    <div className="bg-white rounded-xl border border-gray-100 px-4 sm:px-6 py-5">
       <div className="flex items-baseline justify-between mb-4">
         <p className="text-sm font-semibold text-gray-700">BEST {limit} 메뉴</p>
         <p className="text-[11px] text-gray-400">매출 순</p>
@@ -66,7 +71,7 @@ export default function TopProductsCard({
               CATEGORY_COLOR[p.category] ?? 'bg-gray-100 text-gray-500'
 
             return (
-              <li key={p.product_name} className="flex items-center gap-3 text-sm">
+              <li key={p.product_name} className="flex items-center gap-2 sm:gap-3 text-sm">
                 <span className="w-5 text-xs font-semibold text-gray-400 shrink-0 text-right">
                   {rank}
                 </span>
@@ -89,8 +94,8 @@ export default function TopProductsCard({
                     />
                   </div>
                 </div>
-                <span className="text-gray-700 tabular-nums shrink-0 text-right w-20">
-                  {p.amount.toLocaleString()}원
+                <span className="text-gray-700 tabular-nums shrink-0 text-right w-12 sm:w-20 text-xs sm:text-sm">
+                  {fmtAmount(p.amount)}
                 </span>
                 <span className="w-8 text-right shrink-0 text-[11px]">
                   {rankDelta === null ? (

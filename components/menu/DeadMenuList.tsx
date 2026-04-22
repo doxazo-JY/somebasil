@@ -34,11 +34,11 @@ interface DeadMenuListProps {
 export default function DeadMenuList({ menus, periodLabel }: DeadMenuListProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
-      <div className="flex items-baseline justify-between mb-4">
-        <p className="text-sm font-semibold text-gray-700">
+      <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
+        <p className="text-sm font-semibold text-gray-700 whitespace-nowrap">
           죽은 메뉴 <span className="text-xs text-gray-400 font-normal">({periodLabel})</span>
         </p>
-        <p className="text-[11px] text-gray-400">판매량 낮은 순</p>
+        <p className="text-[11px] text-gray-400 [word-break:keep-all]">판매량 낮은 순</p>
       </div>
 
       {menus.length === 0 ? (
@@ -55,25 +55,27 @@ export default function DeadMenuList({ menus, periodLabel }: DeadMenuListProps) 
             return (
               <li
                 key={m.product_name}
-                className="flex items-center gap-3 text-sm py-1"
+                className="flex items-center gap-2 text-sm py-1"
               >
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${catColor}`}
                 >
                   {catLabel}
                 </span>
-                <span className="flex-1 truncate text-gray-800">{m.product_name}</span>
-                <span className="text-[11px] text-gray-400 shrink-0 tabular-nums w-16 text-right">
+                <span className="flex-1 min-w-0 truncate text-gray-800">{m.product_name}</span>
+                <span className="text-[11px] text-gray-400 shrink-0 tabular-nums w-10 text-right">
                   {m.quantity}잔
                 </span>
-                <span className="text-[11px] text-gray-400 shrink-0 tabular-nums w-20 text-right">
-                  {m.amount.toLocaleString()}원
+                <span className="text-[11px] text-gray-400 shrink-0 tabular-nums w-14 text-right">
+                  {m.amount >= 10000
+                    ? `${Math.round(m.amount / 10000)}만`
+                    : `${m.amount.toLocaleString()}`}
                 </span>
-                <span className="text-[11px] shrink-0 w-20 text-right">
+                <span className="text-[11px] shrink-0 w-14 text-right">
                   {daysAgo === null ? (
                     <span className="text-gray-300">—</span>
                   ) : daysAgo === 0 ? (
-                    <span className="text-gray-400">오늘 판매</span>
+                    <span className="text-gray-400">오늘</span>
                   ) : daysAgo > 60 ? (
                     <span className="text-red-400">{daysAgo}일 전</span>
                   ) : (

@@ -45,14 +45,14 @@ export default function WeekdayHourHeatmap({
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
-      <div className="flex items-baseline justify-between mb-4">
-        <div className="flex items-baseline gap-2">
-          <p className="text-sm font-semibold text-gray-700">요일 × 시간대 매출</p>
+      <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
+        <div className="flex items-baseline gap-2 [word-break:keep-all]">
+          <p className="text-sm font-semibold text-gray-700 whitespace-nowrap">요일 × 시간대 매출</p>
           {rangeLabel && (
-            <span className="text-[11px] text-gray-400">· {rangeLabel}</span>
+            <span className="text-[11px] text-gray-400 whitespace-nowrap">· {rangeLabel}</span>
           )}
         </div>
-        <p className="text-[11px] text-gray-400">색이 진할수록 주문 많음</p>
+        <p className="text-[11px] text-gray-400 [word-break:keep-all]">색이 진할수록 주문 많음</p>
       </div>
 
       <div className="overflow-x-auto">

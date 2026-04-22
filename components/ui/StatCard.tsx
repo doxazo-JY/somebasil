@@ -4,9 +4,10 @@ interface StatCardProps {
   subLabel?: string
   change?: number // 전월 대비 % (양수=증가, 음수=감소)
   highlight?: 'positive' | 'negative' | 'neutral'
+  className?: string
 }
 
-export default function StatCard({ label, value, subLabel, change, highlight }: StatCardProps) {
+export default function StatCard({ label, value, subLabel, change, highlight, className }: StatCardProps) {
   const valueColor =
     highlight === 'positive'
       ? 'text-[#1a5c3a]'
@@ -15,7 +16,7 @@ export default function StatCard({ label, value, subLabel, change, highlight }: 
       : 'text-gray-900'
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 px-6 py-5 flex flex-col gap-2">
+    <div className={`bg-white rounded-xl border border-gray-100 px-6 py-5 flex flex-col gap-2 ${className ?? ''}`}>
       <p className="text-sm text-gray-400 font-medium">{label}</p>
       <p className={`text-2xl font-bold tracking-tight ${valueColor}`}>{value}</p>
       {(change !== undefined || subLabel) && (

@@ -71,20 +71,22 @@ export default function CategoryDonut({ data, products }: CategoryDonutProps) {
         </p>
       </div>
 
-      <div className="flex items-center gap-6">
-        <ResponsiveContainer width={120} height={120}>
+      <div className="flex items-center gap-3 sm:gap-6">
+        <div className="shrink-0">
+        <ResponsiveContainer width={100} height={100}>
           <PieChart>
             <Pie
               data={chartData}
               cx="50%"
               cy="50%"
-              innerRadius={35}
-              outerRadius={54}
+              innerRadius={30}
+              outerRadius={46}
               dataKey="value"
               strokeWidth={0}
-              onClick={(e: { category?: string }) => {
-                if (!e?.category) return
-                setSelected((prev) => (prev === e.category ? null : e.category!))
+              onClick={(data) => {
+                const cat = (data as { category?: string })?.category
+                if (!cat) return
+                setSelected((prev) => (prev === cat ? null : cat))
               }}
               cursor="pointer"
             >
@@ -107,8 +109,9 @@ export default function CategoryDonut({ data, products }: CategoryDonutProps) {
             />
           </PieChart>
         </ResponsiveContainer>
+        </div>
 
-        <ul className="flex flex-col gap-1.5 text-xs text-gray-600 flex-1">
+        <ul className="flex flex-col gap-1.5 text-xs text-gray-600 flex-1 min-w-0">
           {chartData.map((item) => {
             const isSelected = selected === item.category
             return (
@@ -129,7 +132,7 @@ export default function CategoryDonut({ data, products }: CategoryDonutProps) {
                   className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ background: CATEGORY_HEX[item.category] ?? FALLBACK_COLOR }}
                 />
-                <span className="flex-1">{item.name}</span>
+                <span className="flex-1 truncate">{item.name}</span>
                 <span className="font-medium text-gray-800">
                   {total > 0 ? Math.round((item.value / total) * 100) : 0}%
                 </span>

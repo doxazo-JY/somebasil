@@ -36,8 +36,10 @@ export default function FileDropZone({ accept, hint, onFile, loading }: FileDrop
         <p className="text-sm text-gray-500">파싱 중...</p>
       ) : (
         <>
-          <p className="text-sm font-medium text-gray-600">파일을 드래그하거나 클릭해서 선택</p>
-          <p className="text-xs text-gray-400">{hint}</p>
+          <p className="text-sm font-medium text-gray-600 text-center [word-break:keep-all]">
+            파일을 드래그하거나 클릭해서 선택
+          </p>
+          <p className="text-xs text-gray-400 text-center [word-break:keep-all]">{hint}</p>
         </>
       )}
     </div>

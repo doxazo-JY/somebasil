@@ -18,7 +18,7 @@ interface Props {
 
 export default function HeatmapRangeSelector({ current }: Props) {
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit max-w-full overflow-x-auto">
       {RANGE_ORDER.map((r) => {
         const active = current === r
         return (
@@ -26,7 +26,7 @@ export default function HeatmapRangeSelector({ current }: Props) {
             key={r}
             href={`?heatmap=${r}`}
             scroll={false}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap [word-break:keep-all] ${
               active
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'

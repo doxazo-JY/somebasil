@@ -143,7 +143,7 @@ export default function UploadSection() {
         accept=".xlsx,.xls"
         hint={
           tab === 'daily'
-            ? 'POS 일일매출 상세내역 엑셀 파일 (단일 날짜 / 기간 모두 가능)'
+            ? 'POS 일일매출 엑셀 파일 (기간·단일 모두 가능)'
             : '하나은행 거래내역 엑셀 파일'
         }
         onFile={handleFile}

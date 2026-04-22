@@ -83,7 +83,7 @@ export default async function MenuAnalysisPage({ searchParams }: PageProps) {
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">메뉴 분석</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
+        <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">
           요일·시간 패턴, 제품 믹스, 죽은 메뉴 — 주간 보고 / 월간 의사결정용
         </p>
       </div>

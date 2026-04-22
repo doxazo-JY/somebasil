@@ -122,8 +122,8 @@ export default function ReclassifyTable({ items }: Props) {
       </div>
 
       {/* 테이블 */}
-      <div className="max-h-[480px] overflow-y-auto">
-        <table className="w-full text-xs">
+      <div className="max-h-[480px] overflow-auto">
+        <table className="w-full text-xs min-w-[640px]">
           <thead className="sticky top-0 bg-gray-50 text-gray-400 font-medium">
             <tr>
               <th className="text-left px-4 py-2">날짜</th>

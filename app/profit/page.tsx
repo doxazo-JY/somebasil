@@ -69,15 +69,15 @@ export default async function ProfitPage({ searchParams }: PageProps) {
         <YearFilter year={year} />
       </div>
 
-      {/* 상단: YTD KPI 3 + 월평균 손익분기 분석 (총 6열) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-4 items-stretch">
+      {/* 상단: YTD KPI 3 + 월평균 손익분기 분석 (모바일 2열, sm 3열, lg 6열) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-4 items-stretch">
         <ProfitStatCards
           ytdIncome={ytdIncome}
           ytdExpense={ytdExpense}
           ytdProfit={ytdProfit}
           monthsWithData={monthsWithData}
         />
-        <div className="sm:col-span-3 lg:col-span-3">
+        <div className="col-span-2 sm:col-span-3 lg:col-span-3">
           <BreakEvenSection
             income={avgIncome}
             expense={avgExpense}

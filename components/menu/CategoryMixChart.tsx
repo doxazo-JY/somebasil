@@ -95,9 +95,9 @@ export default function CategoryMixChart({
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
-      <div className="flex items-baseline justify-between mb-4">
-        <p className="text-sm font-semibold text-gray-700">월별 카테고리 믹스 변화</p>
-        <p className="text-[11px] text-gray-400">
+      <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
+        <p className="text-sm font-semibold text-gray-700 whitespace-nowrap">월별 카테고리 믹스</p>
+        <p className="text-[11px] text-gray-400 [word-break:keep-all]">
           {mode === 'percent' ? '비율 (%)' : '금액'} · 누적 영역
         </p>
       </div>

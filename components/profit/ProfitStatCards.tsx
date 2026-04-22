@@ -48,6 +48,7 @@ export default function ProfitStatCards({
         value={ytdIncome >= ytdExpense ? '흑자' : '적자'}
         subLabel={`매출 ${formatManwon(ytdIncome)} · 지출 ${formatManwon(ytdExpense)}`}
         highlight={ytdIncome >= ytdExpense ? 'positive' : 'negative'}
+        className="col-span-2 sm:col-span-1"
       />
     </>
   )
