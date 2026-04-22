@@ -41,18 +41,32 @@ export interface HeatmapCell {
   orderCount: number
 }
 
+// KST(+09:00)로 저장된 order_time 문자열에서 요일/시간 추출
+// 서버 타임존(Vercel=UTC, 로컬=KST)에 관계없이 일관된 KST 기준 값 반환
+function extractKSTWeekdayAndHour(
+  isoString: string,
+): { weekday: number; hour: number } | null {
+  const m = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):/)
+  if (!m) return null
+  const [, y, mo, d, h] = m
+  const weekday = new Date(
+    Date.UTC(Number(y), Number(mo) - 1, Number(d)),
+  ).getUTCDay()
+  return { weekday, hour: Number(h) }
+}
+
 export async function getWeekdayHourHeatmap(sinceDate: string): Promise<HeatmapCell[]> {
   const rows = await fetchPosRows(sinceDate)
 
-  // (weekday, hour, order_id) 단위로 집계
+  // (weekday, hour, order_id) 단위로 집계 — KST 기준
   const amountMap = new Map<string, number>()
   const orderMap = new Map<string, Set<string>>()
 
   for (const r of rows) {
     if (!r.order_time) continue
-    const t = new Date(r.order_time)
-    const weekday = t.getDay()
-    const hour = t.getHours()
+    const parsed = extractKSTWeekdayAndHour(r.order_time)
+    if (!parsed) continue
+    const { weekday, hour } = parsed
     const key = `${weekday}|${hour}`
 
     amountMap.set(key, (amountMap.get(key) ?? 0) + r.amount)

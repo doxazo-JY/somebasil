@@ -5,6 +5,43 @@ type SalesRow = { date: string; amount: number; source: string }
 type ExpenseRow = { date: string; amount: number }
 
 // ─────────────────────────────────────────────
+// 타임존 안전 날짜 유틸 (서버 KST/UTC 무관하게 KST 기준 계산)
+// ─────────────────────────────────────────────
+const KST_OFFSET_MS = 9 * 3600 * 1000
+
+// 현재 시각 기준 KST 연/월/일/요일
+function getKSTTodayParts() {
+  const now = new Date()
+  const kst = new Date(now.getTime() + KST_OFFSET_MS)
+  return {
+    year: kst.getUTCFullYear(),
+    month: kst.getUTCMonth(),
+    day: kst.getUTCDate(),
+    weekday: kst.getUTCDay(),
+  }
+}
+
+// YYYY-MM-DD 문자열을 KST 기준 Date(UTC 자정)로
+function dateStrToKSTDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
+// KST 기준 Date(UTC 자정)를 YYYY-MM-DD 문자열로
+function kstDateToStr(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+// 월요일 시작 주의 시작일 반환 (dateStr 기준)
+function weekStartOf(dateStr: string): string {
+  const d = dateStrToKSTDate(dateStr)
+  const day = d.getUTCDay() // 0=일 (KST 기준 — UTC 자정이라 안전)
+  const diff = day === 0 ? -6 : 1 - day
+  d.setUTCDate(d.getUTCDate() + diff)
+  return kstDateToStr(d)
+}
+
+// ─────────────────────────────────────────────
 // 한 주의 상세 분석 (주간보고용)
 // ─────────────────────────────────────────────
 export interface WeekDetail {
@@ -88,12 +125,12 @@ export async function getWeekDetail(
     dailyMap.set(r.date, entry)
   }
   const daily: WeekDetail['daily'] = []
-  const start = new Date(weekStart)
+  const start = dateStrToKSTDate(weekStart) // UTC 자정 = KST 00:00
   for (let i = 0; i < 7; i++) {
     const d = new Date(start)
-    d.setDate(d.getDate() + i)
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const weekday = d.getDay()
+    d.setUTCDate(d.getUTCDate() + i)
+    const dateStr = kstDateToStr(d)
+    const weekday = d.getUTCDay()
     const entry = dailyMap.get(dateStr)
     daily.push({
       date: dateStr,
@@ -179,28 +216,26 @@ export interface WeekOption {
 }
 
 export function getRecentWeekOptions(count: number = 8): WeekOption[] {
-  const today = new Date()
-  // 월요일 기준 이번 주 시작
-  const day = today.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  const thisWeekStart = new Date(today)
-  thisWeekStart.setDate(today.getDate() + diff)
-  thisWeekStart.setHours(0, 0, 0, 0)
+  // KST 기준 오늘 → 이번 주 월요일 (UTC 자정으로 고정)
+  const { year, month, day, weekday } = getKSTTodayParts()
+  const diff = weekday === 0 ? -6 : 1 - weekday
+  const thisWeekStart = new Date(Date.UTC(year, month, day + diff))
 
   const options: WeekOption[] = []
   for (let i = 0; i < count; i++) {
     const ws = new Date(thisWeekStart)
-    ws.setDate(ws.getDate() - i * 7)
+    ws.setUTCDate(ws.getUTCDate() - i * 7)
     const we = new Date(ws)
-    we.setDate(we.getDate() + 6)
+    we.setUTCDate(we.getUTCDate() + 6)
 
-    const wsStr = `${ws.getFullYear()}-${String(ws.getMonth() + 1).padStart(2, '0')}-${String(ws.getDate()).padStart(2, '0')}`
-    const weStr = `${we.getFullYear()}-${String(we.getMonth() + 1).padStart(2, '0')}-${String(we.getDate()).padStart(2, '0')}`
+    const wsStr = kstDateToStr(ws)
+    const weStr = kstDateToStr(we)
 
-    const m = ws.getMonth() + 1
-    const d = ws.getDate()
+    const m = ws.getUTCMonth() + 1
+    const d = ws.getUTCDate()
     const weekOfMonth = Math.ceil(d / 7)
-    const ordinal = ['첫째', '둘째', '셋째', '넷째', '다섯째'][weekOfMonth - 1] ?? `${weekOfMonth}번째`
+    const ordinal =
+      ['첫째', '둘째', '셋째', '넷째', '다섯째'][weekOfMonth - 1] ?? `${weekOfMonth}번째`
 
     options.push({
       weekStart: wsStr,
@@ -213,19 +248,7 @@ export function getRecentWeekOptions(count: number = 8): WeekOption[] {
   return options
 }
 
-// 월요일 기준 주 시작일 계산
-function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay() // 0=일
-  const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10)
-}
+// (서버 TZ 무관) 입력 날짜 문자열의 주 시작일 — weekStartOf로 이관됨 (위 유틸 사용)
 
 export interface WeekData {
   weekStart: string   // YYYY-MM-DD (월요일)
@@ -237,19 +260,20 @@ export interface WeekData {
   hasExpenseData: boolean
 }
 
-// 최근 N주 데이터 집계
+// 최근 N주 데이터 집계 (KST 기준)
 export async function getWeeklySummary(weeks: number = 6): Promise<WeekData[]> {
   const supabase = createServerClient()
 
-  // 기준일: 오늘 기준 weeks주 전 월요일
-  const today = new Date()
-  const thisWeekStart = getWeekStart(today)
+  // KST 기준 이번 주 월요일 (UTC 자정으로 고정)
+  const { year, month, day, weekday } = getKSTTodayParts()
+  const diff = weekday === 0 ? -6 : 1 - weekday
+  const thisWeekStart = new Date(Date.UTC(year, month, day + diff))
+
   const since = new Date(thisWeekStart)
-  since.setDate(since.getDate() - (weeks - 1) * 7)
+  since.setUTCDate(since.getUTCDate() - (weeks - 1) * 7)
+  const sinceStr = kstDateToStr(since)
 
-  const sinceStr = toDateStr(since)
-
-  // 일별 매출 (daily_sales) — source 포함해서 POS 우선 처리 (pagination)
+  // 일별 매출 (daily_sales) — source 포함해서 POS 우선 처리
   const salesData = await fetchAllRows<SalesRow>((from, to) =>
     supabase
       .from('daily_sales')
@@ -259,7 +283,7 @@ export async function getWeeklySummary(weeks: number = 6): Promise<WeekData[]> {
       .range(from, to)
   )
 
-  // 지출 (monthly_expenses — date 컬럼 있는 것만, excluded 카테고리는 집계 제외)
+  // 지출 (monthly_expenses — date 컬럼 있는 것만, excluded 제외)
   const expenseData = await fetchAllRows<ExpenseRow>((from, to) =>
     supabase
       .from('monthly_expenses')
@@ -279,43 +303,45 @@ export async function getWeeklySummary(weeks: number = 6): Promise<WeekData[]> {
     else incomeByDate[row.date].bank += row.amount
   }
 
-  // 주별로 그룹핑 (POS 우선)
+  // 주별로 그룹핑 (POS 우선) — weekStartOf로 날짜 문자열 기반 계산
   const incomeByWeek: Record<string, number> = {}
   const expenseByWeek: Record<string, number> = {}
 
   for (const [date, amounts] of Object.entries(incomeByDate)) {
-    const ws = toDateStr(getWeekStart(new Date(date)))
+    const ws = weekStartOf(date)
     const amount = amounts.pos > 0 ? amounts.pos : amounts.bank
     incomeByWeek[ws] = (incomeByWeek[ws] ?? 0) + amount
   }
 
   for (const row of expenseData) {
     if (!row.date) continue
-    const ws = toDateStr(getWeekStart(new Date(row.date)))
+    const ws = weekStartOf(row.date)
     expenseByWeek[ws] = (expenseByWeek[ws] ?? 0) + row.amount
   }
 
-  // 최근 N주 배열 생성 (과거 → 현재 순)
+  // 최근 N주 배열 (과거 → 현재)
   const result: WeekData[] = []
   for (let i = weeks - 1; i >= 0; i--) {
     const weekStart = new Date(thisWeekStart)
-    weekStart.setDate(weekStart.getDate() - i * 7)
+    weekStart.setUTCDate(weekStart.getUTCDate() - i * 7)
     const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekEnd.getDate() + 6)
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6)
 
-    const wsStr = toDateStr(weekStart)
+    const wsStr = kstDateToStr(weekStart)
+    const weStr = kstDateToStr(weekEnd)
     const income = incomeByWeek[wsStr] ?? 0
     const expense = expenseByWeek[wsStr] ?? 0
     const hasExpenseData = wsStr in expenseByWeek
 
-    const m = weekStart.getMonth() + 1
-    const d = weekStart.getDate()
+    const m = weekStart.getUTCMonth() + 1
+    const d = weekStart.getUTCDate()
     const weekOfMonth = Math.ceil(d / 7)
-    const ordinal = ['첫째', '둘째', '셋째', '넷째', '다섯째'][weekOfMonth - 1] ?? `${weekOfMonth}번째`
+    const ordinal =
+      ['첫째', '둘째', '셋째', '넷째', '다섯째'][weekOfMonth - 1] ?? `${weekOfMonth}번째`
 
     result.push({
       weekStart: wsStr,
-      weekEnd: toDateStr(weekEnd),
+      weekEnd: weStr,
       label: `${m}월 ${ordinal} 주`,
       income,
       expense,

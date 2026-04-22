@@ -13,37 +13,46 @@ import {
   getDeadMenus,
 } from '@/lib/supabase/queries/menu'
 
+// KST 기준 오늘 → UTC 자정 Date
+function getKSTTodayUTC(): Date {
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  return new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()))
+}
+
 function toDateStr(d: Date) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
-// 히트맵 range → sinceDate 변환
+// 히트맵 range → sinceDate 변환 (KST 기준)
 function heatmapSinceDate(range: HeatmapRange): string {
-  const today = new Date()
+  const today = getKSTTodayUTC()
   if (range === '4w') {
     const d = new Date(today)
-    d.setDate(d.getDate() - 28)
+    d.setUTCDate(d.getUTCDate() - 28)
     return toDateStr(d)
   }
   if (range === '8w') {
     const d = new Date(today)
-    d.setDate(d.getDate() - 56)
+    d.setUTCDate(d.getUTCDate() - 56)
     return toDateStr(d)
   }
   if (range === '12w') {
     const d = new Date(today)
-    d.setDate(d.getDate() - 84)
+    d.setUTCDate(d.getUTCDate() - 84)
     return toDateStr(d)
   }
   if (range === 'month') {
-    return toDateStr(new Date(today.getFullYear(), today.getMonth(), 1))
+    return toDateStr(
+      new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)),
+    )
   }
-  // all
+  // all (12개월)
   const d = new Date(today)
-  d.setMonth(d.getMonth() - 12)
+  d.setUTCMonth(d.getUTCMonth() - 12)
   return toDateStr(d)
 }
 
@@ -59,11 +68,11 @@ export default async function MenuAnalysisPage({ searchParams }: PageProps) {
     ? (params.heatmap as HeatmapRange)
     : '4w'
 
-  const today = new Date()
+  const today = getKSTTodayUTC()
   const since12m = new Date(today)
-  since12m.setMonth(since12m.getMonth() - 12)
+  since12m.setUTCMonth(since12m.getUTCMonth() - 12)
   const since2m = new Date(today)
-  since2m.setMonth(since2m.getMonth() - 2)
+  since2m.setUTCMonth(since2m.getUTCMonth() - 2)
 
   const since12mStr = toDateStr(since12m)
   const since2mStr = toDateStr(since2m)

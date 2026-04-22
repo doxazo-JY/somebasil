@@ -13,15 +13,21 @@ interface PageProps {
   searchParams: Promise<{ week?: string }>
 }
 
+// YYYY-MM-DD를 KST 기준 UTC 자정 Date로
+function parseKST(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
 function toStr(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
 function prevWeekRange(weekStart: string, weekEnd: string): { start: string; end: string } {
-  const start = new Date(weekStart)
-  const end = new Date(weekEnd)
-  start.setDate(start.getDate() - 7)
-  end.setDate(end.getDate() - 7)
+  const start = parseKST(weekStart)
+  const end = parseKST(weekEnd)
+  start.setUTCDate(start.getUTCDate() - 7)
+  end.setUTCDate(end.getUTCDate() - 7)
   return { start: toStr(start), end: toStr(end) }
 }
 
@@ -39,9 +45,9 @@ function capPrevEndToSamePartial(
     .pop()?.date
   if (!lastDataDate) return prevEnd
 
-  // selectedStart로부터 며칠째(0=월요일)
-  const selStart = new Date(selectedStart)
-  const lastD = new Date(lastDataDate)
+  // selectedStart로부터 며칠째(0=월요일) — KST 기준
+  const selStart = parseKST(selectedStart)
+  const lastD = parseKST(lastDataDate)
   const daysIntoWeek = Math.floor(
     (lastD.getTime() - selStart.getTime()) / (1000 * 60 * 60 * 24),
   )
@@ -50,9 +56,9 @@ function capPrevEndToSamePartial(
   if (daysIntoWeek >= 6) return prevEnd
 
   // 전주 같은 요일까지로 제한
-  const pStart = new Date(prevStart)
+  const pStart = parseKST(prevStart)
   const pCap = new Date(pStart)
-  pCap.setDate(pCap.getDate() + daysIntoWeek)
+  pCap.setUTCDate(pCap.getUTCDate() + daysIntoWeek)
   return toStr(pCap)
 }
 
