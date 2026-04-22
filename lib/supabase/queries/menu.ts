@@ -41,18 +41,18 @@ export interface HeatmapCell {
   orderCount: number
 }
 
-// KST(+09:00)로 저장된 order_time 문자열에서 요일/시간 추출
-// 서버 타임존(Vercel=UTC, 로컬=KST)에 관계없이 일관된 KST 기준 값 반환
+// DB의 TIMESTAMPTZ는 UTC로 정규화되어 반환됨 (예: "2025-12-11T03:04:00+00:00")
+// 절대 시점을 파싱 후 +9시간 시프트해서 KST wall-clock 추출
 function extractKSTWeekdayAndHour(
   isoString: string,
 ): { weekday: number; hour: number } | null {
-  const m = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):/)
-  if (!m) return null
-  const [, y, mo, d, h] = m
-  const weekday = new Date(
-    Date.UTC(Number(y), Number(mo) - 1, Number(d)),
-  ).getUTCDay()
-  return { weekday, hour: Number(h) }
+  const utcMs = Date.parse(isoString)
+  if (isNaN(utcMs)) return null
+  const kst = new Date(utcMs + 9 * 3600 * 1000)
+  return {
+    weekday: kst.getUTCDay(),
+    hour: kst.getUTCHours(),
+  }
 }
 
 export async function getWeekdayHourHeatmap(sinceDate: string): Promise<HeatmapCell[]> {
