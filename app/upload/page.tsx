@@ -1,3 +1,4 @@
+import PageTabs from '@/components/ui/PageTabs'
 import UploadSection from '@/components/upload/UploadSection'
 import UploadHistory from '@/components/upload/UploadHistory'
 import { getUploadHistory } from '@/lib/supabase/queries/upload'
@@ -9,6 +10,7 @@ export default async function UploadPage() {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+      <PageTabs group="admin" />
       {/* 헤더 */}
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">데이터 업로드</h1>

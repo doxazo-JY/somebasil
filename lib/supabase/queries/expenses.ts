@@ -17,7 +17,9 @@ export async function getMonthlyExpensesByCategory(year: number, month: number) 
     return acc
   }, {})
 
-  return grouped // { ingredients: 000, labor: 000, fixed: 000, card: 000 }
+  // 재료비(현금)/재료비(카드) 합산을 `ingredients`로도 노출 (기존 호환)
+  grouped.ingredients = (grouped.ingredients_cash ?? 0) + (grouped.ingredients_card ?? 0)
+  return grouped
 }
 
 // 연도별 월별 카테고리별 지출 추이 (라인차트용, excluded 제외)
@@ -41,9 +43,13 @@ export async function getYearlyExpenseTrend(year: number) {
 
   return Array.from({ length: 12 }, (_, i) => {
     const m = i + 1
+    const cash = byMonth[m]?.ingredients_cash ?? 0
+    const card_ing = byMonth[m]?.ingredients_card ?? 0
     return {
       month: m,
-      ingredients: byMonth[m]?.ingredients ?? 0,
+      ingredients_cash: cash,
+      ingredients_card: card_ing,
+      ingredients: cash + card_ing, // 합계 (원가율 등 기존 소비처 호환)
       labor: byMonth[m]?.labor ?? 0,
       fixed: byMonth[m]?.fixed ?? 0,
       equipment: byMonth[m]?.equipment ?? 0,

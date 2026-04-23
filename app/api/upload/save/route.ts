@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { fetchAllRows } from '@/lib/supabase/fetchAll'
+import { recalcMonthlySummary } from '@/lib/supabase/recalc'
 import type { DailySalesRow } from '../daily-sales/route'
 import type { BankRow } from '../bank/route'
-
-type SalesRow = { date: string; amount: number; source: string }
 
 export async function POST(req: NextRequest) {
   const { type, rows, filename } = await req.json() as {
@@ -30,7 +28,7 @@ export async function POST(req: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // POS 업로드 시 monthly_summary.income도 갱신 (daily_sales 기준으로 재집계)
+    // 영향받은 월 monthly_summary 재계산 (POS 우선 + 토글 + 수동 조정 반영)
     const monthsAffected = new Set(
       salesRows.map((r) => {
         const [year, month] = r.date.split('-').map(Number)
@@ -39,36 +37,7 @@ export async function POST(req: NextRequest) {
     )
     for (const key of monthsAffected) {
       const [year, month] = key.split('-').map(Number)
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-      const endMonth = month === 12 ? 1 : month + 1
-      const endYear = month === 12 ? year + 1 : year
-      const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
-
-      // POS 있는 날은 pos만, 없는 날은 bank 합산 (pagination으로 전체 조회)
-      const allSales = await fetchAllRows<SalesRow>((from, to) =>
-        supabase
-          .from('daily_sales')
-          .select('date, amount, source')
-          .gte('date', startDate)
-          .lt('date', endDate)
-          .order('date')
-          .range(from, to)
-      )
-
-      const totalIncome = calcIncomePreferPos(allSales)
-
-      const { data: existing } = await supabase
-        .from('monthly_summary')
-        .select('id')
-        .eq('year', year)
-        .eq('month', month)
-        .single()
-
-      if (existing) {
-        await supabase.from('monthly_summary').update({ income: totalIncome }).eq('id', existing.id)
-      } else {
-        await supabase.from('monthly_summary').insert({ year, month, income: totalIncome, total_expense: 0 })
-      }
+      await recalcMonthlySummary(supabase, year, month)
     }
   }
 
@@ -105,40 +74,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 월별 지출 합산 → monthly_summary.total_expense 업데이트
-    // DB 전체에서 다시 집계 (excluded 제외, date 있는 것만)
+    // 영향받은 월 monthly_summary 재계산 (토글 + 수동 조정 반영)
     const monthsAffected = new Set(
       expenseRows.map((r) => {
         const [y, m] = r.date.split('-').map(Number)
         return `${y}-${m}`
       })
     )
-
     for (const key of monthsAffected) {
       const [year, month] = key.split('-').map(Number)
-      const allExpenses = await fetchAllRows<{ amount: number }>((from, to) =>
-        supabase
-          .from('monthly_expenses')
-          .select('amount')
-          .eq('year', year)
-          .eq('month', month)
-          .neq('category', 'excluded')
-          .range(from, to)
-      )
-      const totalExpense = allExpenses.reduce((s, r) => s + (r.amount ?? 0), 0)
-
-      const { data: existing } = await supabase
-        .from('monthly_summary')
-        .select('id')
-        .eq('year', year)
-        .eq('month', month)
-        .single()
-
-      if (existing) {
-        await supabase.from('monthly_summary').update({ total_expense: totalExpense }).eq('id', existing.id)
-      } else {
-        await supabase.from('monthly_summary').insert({ year, month, income: 0, total_expense: totalExpense })
-      }
+      await recalcMonthlySummary(supabase, year, month)
     }
   }
 
@@ -150,15 +95,4 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json({ ok: true })
-}
-
-// POS 우선: 날짜에 pos 데이터 있으면 pos만, 없으면 bank 사용
-function calcIncomePreferPos(rows: SalesRow[]): number {
-  const byDate: Record<string, { pos: number; bank: number }> = {}
-  for (const r of rows) {
-    if (!byDate[r.date]) byDate[r.date] = { pos: 0, bank: 0 }
-    if (r.source === 'pos') byDate[r.date].pos += r.amount
-    else byDate[r.date].bank += r.amount
-  }
-  return Object.values(byDate).reduce((sum, d) => sum + (d.pos > 0 ? d.pos : d.bank), 0)
 }

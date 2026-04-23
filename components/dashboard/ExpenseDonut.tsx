@@ -13,7 +13,8 @@ interface ExpenseDonutProps {
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
-  ingredients: '재료비',
+  ingredients_cash: '재료비(현금)',
+  ingredients_card: '재료비(카드)',
   labor: '인건비',
   fixed: '고정비',
   equipment: '설비투자',

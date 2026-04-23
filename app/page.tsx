@@ -1,3 +1,4 @@
+import PageTabs from '@/components/ui/PageTabs'
 import StatCard from '@/components/ui/StatCard'
 import TrendChart from '@/components/dashboard/TrendChart'
 import ExpenseDonut from '@/components/dashboard/ExpenseDonut'
@@ -68,6 +69,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+      <PageTabs group="overview" />
       {/* 헤더 */}
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">대시보드</h1>

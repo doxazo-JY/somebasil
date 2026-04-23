@@ -1,3 +1,4 @@
+import PageTabs from '@/components/ui/PageTabs'
 import YearFilter from '@/components/ui/YearFilter'
 import ProfitStatCards from '@/components/profit/ProfitStatCards'
 import ProfitTrendChart from '@/components/profit/ProfitTrendChart'
@@ -50,16 +51,18 @@ export default async function ProfitPage({ searchParams }: PageProps) {
   const ytdCategories = yearlyExpenses.reduce(
     (acc, m) => ({
       labor: acc.labor + (m.labor ?? 0),
-      ingredients: acc.ingredients + (m.ingredients ?? 0),
+      ingredients_cash: acc.ingredients_cash + (m.ingredients_cash ?? 0),
+      ingredients_card: acc.ingredients_card + (m.ingredients_card ?? 0),
       fixed: acc.fixed + (m.fixed ?? 0),
       equipment: acc.equipment + (m.equipment ?? 0),
       card: acc.card + (m.card ?? 0),
     }),
-    { labor: 0, ingredients: 0, fixed: 0, equipment: 0, card: 0 },
+    { labor: 0, ingredients_cash: 0, ingredients_card: 0, fixed: 0, equipment: 0, card: 0 },
   )
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+      <PageTabs group="overview" />
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
@@ -123,7 +126,8 @@ export default async function ProfitPage({ searchParams }: PageProps) {
         <DeficitBreakdown
           income={ytdIncome}
           labor={ytdCategories.labor}
-          ingredients={ytdCategories.ingredients}
+          ingredients_cash={ytdCategories.ingredients_cash}
+          ingredients_card={ytdCategories.ingredients_card}
           fixed={ytdCategories.fixed}
           equipment={ytdCategories.equipment}
           card={ytdCategories.card}

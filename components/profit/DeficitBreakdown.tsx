@@ -3,7 +3,8 @@
 interface DeficitBreakdownProps {
   income: number
   labor: number
-  ingredients: number
+  ingredients_cash: number
+  ingredients_card: number
   fixed: number
   equipment: number
   card: number
@@ -12,11 +13,12 @@ interface DeficitBreakdownProps {
 }
 
 const CATEGORY_INFO: Record<string, { label: string; color: string; bar: string; note: string }> = {
-  labor:       { label: '인건비',   color: 'text-violet-600', bar: 'bg-violet-400', note: '구조적 고정비' },
-  ingredients: { label: '재료비',   color: 'text-amber-600',  bar: 'bg-amber-400',  note: '프리미엄 원재료' },
-  fixed:       { label: '고정비',   color: 'text-blue-600',   bar: 'bg-blue-400',   note: '임대료 등' },
-  equipment:   { label: '설비투자', color: 'text-sky-600',    bar: 'bg-sky-400',    note: '일회성 자본 지출' },
-  card:        { label: '기타',     color: 'text-gray-500',   bar: 'bg-gray-300',   note: '카드대금 등' },
+  labor:             { label: '인건비',       color: 'text-violet-600', bar: 'bg-violet-400', note: '구조적 고정비' },
+  ingredients_cash:  { label: '재료비(현금)', color: 'text-amber-600',  bar: 'bg-amber-400',  note: '정기 공급처' },
+  ingredients_card:  { label: '재료비(카드)', color: 'text-amber-500',  bar: 'bg-amber-300',  note: '비정기 구매' },
+  fixed:             { label: '고정비',       color: 'text-blue-600',   bar: 'bg-blue-400',   note: '임대료·세금·공과금' },
+  equipment:         { label: '설비투자',     color: 'text-sky-600',    bar: 'bg-sky-400',    note: '일회성 자본 지출' },
+  card:              { label: '기타',         color: 'text-gray-500',   bar: 'bg-gray-300',   note: '카드대금 등' },
 }
 
 function fmt(v: number) {
@@ -26,7 +28,8 @@ function fmt(v: number) {
 export default function DeficitBreakdown({
   income,
   labor,
-  ingredients,
+  ingredients_cash,
+  ingredients_card,
   fixed,
   equipment,
   card,
@@ -34,11 +37,12 @@ export default function DeficitBreakdown({
 }: DeficitBreakdownProps) {
   if (income === 0) return null
 
-  const totalExpense = labor + ingredients + fixed + equipment + card
+  const totalExpense = labor + ingredients_cash + ingredients_card + fixed + equipment + card
   // 0원 항목도 표시 (카테고리 전체 인식을 위해)
   const items = [
     { key: 'labor', amount: labor },
-    { key: 'ingredients', amount: ingredients },
+    { key: 'ingredients_cash', amount: ingredients_cash },
+    { key: 'ingredients_card', amount: ingredients_card },
     { key: 'fixed', amount: fixed },
     { key: 'equipment', amount: equipment },
     { key: 'card', amount: card },

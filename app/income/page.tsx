@@ -1,3 +1,4 @@
+import PageTabs from '@/components/ui/PageTabs'
 import IncomeStatCards from '@/components/income/IncomeStatCards'
 import IncomeTrendChart from '@/components/income/IncomeTrendChart'
 import SalesCalendar from '@/components/income/SalesCalendar'
@@ -73,6 +74,7 @@ export default async function IncomePage({ searchParams }: PageProps) {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+      <PageTabs group="analysis" />
       {/* 헤더 */}
       <div className="flex items-start justify-between mb-6">
         <div>

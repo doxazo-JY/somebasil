@@ -2,7 +2,8 @@ import type { WeekDetail } from '@/lib/supabase/queries/weekly'
 
 const CATEGORY_LABEL: Record<string, string> = {
   labor: '인건비',
-  ingredients: '재료비',
+  ingredients_cash: '재료비(현금)',
+  ingredients_card: '재료비(카드)',
   fixed: '고정비',
   equipment: '설비투자',
   card: '카드대금',
@@ -10,22 +11,24 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 const CATEGORY_HINT: Record<string, string> = {
   labor: '급여',
-  ingredients: '원두·우유·포장·비품 등',
-  fixed: '전기세·임대료·세금·보험',
+  ingredients_cash: '정기 공급처 (원두·말차·우유·소금집)',
+  ingredients_card: '비정기 구매 (마트·편의점·포장재)',
+  fixed: '전기·임대료·세금·보험',
   equipment: '테이블·반죽기 등 일회성',
   card: '기타 카드 결제',
 }
 
 const CATEGORY_HEX: Record<string, string> = {
   labor: '#a78bfa', // violet-400
-  ingredients: '#fbbf24', // amber-400
+  ingredients_cash: '#fbbf24', // amber-400
+  ingredients_card: '#fcd34d', // amber-300
   fixed: '#60a5fa', // blue-400
   equipment: '#7dd3fc', // sky-300
   card: '#9ca3af', // gray-400
 }
 
 // 모든 카테고리 고정 순서 (0원 항목도 보여주기 위해)
-const CATEGORY_ORDER = ['labor', 'ingredients', 'fixed', 'equipment', 'card']
+const CATEGORY_ORDER = ['labor', 'ingredients_cash', 'ingredients_card', 'fixed', 'equipment', 'card']
 
 function fmt(v: number) {
   const abs = Math.round(Math.abs(v) / 10000)

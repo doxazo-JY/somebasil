@@ -1,4 +1,5 @@
 import MonthFilter from '@/components/ui/MonthFilter'
+import PageTabs from '@/components/ui/PageTabs'
 import CostRatioCards from '@/components/expenses/CostRatioCards'
 import ExpenseTrendChart from '@/components/expenses/ExpenseTrendChart'
 import ExpenseItemList from '@/components/expenses/ExpenseItemList'
@@ -37,7 +38,9 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
 
   const income = summary?.income ?? 0
   const labor = expensesByCategory.labor ?? 0
-  const ingredients = expensesByCategory.ingredients ?? 0
+  const ingredientsCash = expensesByCategory.ingredients_cash ?? 0
+  const ingredientsCard = expensesByCategory.ingredients_card ?? 0
+  const ingredients = ingredientsCash + ingredientsCard
   const fixed = expensesByCategory.fixed ?? 0
   const equipment = expensesByCategory.equipment ?? 0
   const card = expensesByCategory.card ?? 0
@@ -45,11 +48,12 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
 
   // 연간 누적 지출 (설비투자 포함)
   const cumExpense = trend.reduce(
-    (s, d) => s + d.ingredients + d.labor + d.fixed + d.equipment + d.card, 0
+    (s, d) => s + d.ingredients_cash + d.ingredients_card + d.labor + d.fixed + d.equipment + d.card, 0
   )
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+      <PageTabs group="analysis" />
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>

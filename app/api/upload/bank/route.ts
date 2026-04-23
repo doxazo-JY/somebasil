@@ -14,22 +14,22 @@ export interface BankRow {
   type: 'income' | 'expense'
 }
 
-// 재료비 키워드 (적요 매칭) — 원재료 + 포장/비품까지 통합 관리
-const INGREDIENT_KEYWORDS = [
+// 재료비(현금) — 정기 공급처 (매달 반복, 주로 현금/계좌이체)
+const INGREDIENT_CASH_COUNTERPARTS = ['홍인호', '김인성', '한성욱', '소금집']
+
+// 재료비(카드) — 비정기 구매 (마트·편의점·도매·부자재 등)
+const INGREDIENT_CARD_KEYWORDS = [
   // 원재료
   '원두', '말차', '우유', '햄', '원두값', '말차값',
   // 일반 재료/포장/비품
   '재료', '비품', '포장', '페트병', '드립백',
-  // 구매처 키워드 (마트·편의점·도매 등)
+  // 구매처 키워드
   '쿠팡', '이마트', '씨유', '최강식자재', '농부의외양간', '딸기청', '화과자',
 ]
 
-// 재료비 수취인 (카페 구매 대납/거래처)
-const INGREDIENT_COUNTERPARTS = ['홍인호']
-
-// 고정비 키워드
+// 고정비 키워드 (전기·세금·보험·공과금·전문가 서비스·POS 시스템 등)
 const FIXED_KEYWORDS = [
-  '전기세', '전기요금', '지방세', '세금', '임대료', '보험료', '근로소득세',
+  '전기', '지방세', '세금', '임대료', '보험료', '근로소득세',
   '직장합산', '건강보험', '국민연금', '회계사', '지코드',
 ]
 
@@ -38,7 +38,7 @@ const EQUIPMENT_KEYWORDS = [
   '테이블', '스피커', '반죽기', '액자', '소분기', '더치기구',
 ]
 
-// 제외 수취인 (집계에서 빼는 개인 출금)
+// 제외 수취인 (대표 개인 인출 — 설정에서 on/off 토글)
 const EXCLUDED_COUNTERPARTS = ['박기선']
 
 function classifyRow(memo: string, counterpart: string, isIncome: boolean): {
@@ -56,27 +56,29 @@ function classifyRow(memo: string, counterpart: string, isIncome: boolean): {
     return { category: 'labor', type: 'expense' }
   }
 
-  // 제외 수취인 (박기선 등)
-  if (EXCLUDED_COUNTERPARTS.some((c) => counterpart.includes(c) || memo.includes(c))) {
+  // 고정비 (excluded보다 먼저 — "지방세_인천계양구(박기선)" 같은 케이스를 고정비로 귀속)
+  if (FIXED_KEYWORDS.some((k) => memo.includes(k) || counterpart.includes(k))) {
+    return { category: 'fixed', type: 'expense' }
+  }
+
+  // 제외 수취인 (대표 개인 인출). 수취인 정확 매칭 — "지방세_인천계양구(박기선)" 같은 포함 매칭 방지
+  if (EXCLUDED_COUNTERPARTS.some((c) => counterpart === c || memo === c)) {
     return { category: 'excluded', type: 'expense' }
   }
 
-  // 설비투자 키워드 (재료비보다 먼저 체크 — "드립백소분기"처럼 재료 키워드와 겹치는 경우 대비)
+  // 설비투자 (재료비보다 먼저 — "드립백소분기"처럼 재료 키워드와 겹치는 경우 대비)
   if (EQUIPMENT_KEYWORDS.some((k) => memo.includes(k))) {
     return { category: 'equipment', type: 'expense' }
   }
 
-  // 재료비 키워드/수취인
-  if (INGREDIENT_KEYWORDS.some((k) => memo.includes(k))) {
-    return { category: 'ingredients', type: 'expense' }
-  }
-  if (INGREDIENT_COUNTERPARTS.some((c) => counterpart.includes(c) || memo.includes(c))) {
-    return { category: 'ingredients', type: 'expense' }
+  // 재료비(현금) — 정기 공급처 수취인 매칭 먼저
+  if (INGREDIENT_CASH_COUNTERPARTS.some((c) => counterpart.includes(c) || memo.includes(c))) {
+    return { category: 'ingredients_cash', type: 'expense' }
   }
 
-  // 고정비 키워드
-  if (FIXED_KEYWORDS.some((k) => memo.includes(k))) {
-    return { category: 'fixed', type: 'expense' }
+  // 재료비(카드) — 비정기 구매 키워드
+  if (INGREDIENT_CARD_KEYWORDS.some((k) => memo.includes(k))) {
+    return { category: 'ingredients_card', type: 'expense' }
   }
 
   // 나머지 출금 → 카드대금 (기본값)

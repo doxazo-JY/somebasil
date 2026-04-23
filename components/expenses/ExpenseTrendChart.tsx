@@ -15,6 +15,8 @@ import { tooltipContentStyle, tooltipItemStyle, tooltipLabelStyle } from '@/comp
 interface MonthlyExpense {
   month: number
   ingredients: number
+  ingredients_cash: number
+  ingredients_card: number
   labor: number
   fixed: number
   equipment: number
@@ -30,7 +32,8 @@ export default function ExpenseTrendChart({ data, selectedMonth }: ExpenseTrendC
   const chartData = data.map((d) => ({
     month: `${d.month}월`,
     인건비: d.labor,
-    재료비: d.ingredients,
+    '재료비(현금)': d.ingredients_cash,
+    '재료비(카드)': d.ingredients_card,
     고정비: d.fixed,
     설비투자: d.equipment,
     카드대금: d.card,
@@ -59,7 +62,8 @@ export default function ExpenseTrendChart({ data, selectedMonth }: ExpenseTrendC
           />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
           <Line type="monotone" dataKey="인건비" stroke="#1a5c3a" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="재료비" stroke="#f59e0b" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="재료비(현금)" stroke="#f59e0b" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="재료비(카드)" stroke="#fcd34d" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="고정비" stroke="#6b7280" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="설비투자" stroke="#0ea5e9" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
           <Line type="monotone" dataKey="카드대금" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />

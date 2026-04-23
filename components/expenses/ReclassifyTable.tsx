@@ -4,7 +4,8 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 
 const CATEGORY_OPTIONS = [
-  { value: 'ingredients', label: '재료비', color: 'text-amber-600' },
+  { value: 'ingredients_cash', label: '재료비(현금)', color: 'text-amber-600' },
+  { value: 'ingredients_card', label: '재료비(카드)', color: 'text-amber-500' },
   { value: 'labor', label: '인건비', color: 'text-violet-600' },
   { value: 'fixed', label: '고정비', color: 'text-blue-600' },
   { value: 'equipment', label: '설비투자', color: 'text-sky-600' },

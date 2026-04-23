@@ -1,3 +1,4 @@
+import PageTabs from '@/components/ui/PageTabs'
 import WeekSelector from '@/components/weekly/WeekSelector'
 import WeeklyKPICards from '@/components/weekly/WeeklyKPICards'
 import DailyBreakdownChart from '@/components/weekly/DailyBreakdownChart'
@@ -98,6 +99,7 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+      <PageTabs group="overview" />
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>

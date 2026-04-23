@@ -1,5 +1,6 @@
 const CATEGORY_LABEL: Record<string, string> = {
-  ingredients: '재료비',
+  ingredients_cash: '재료비(현금)',
+  ingredients_card: '재료비(카드)',
   fixed: '고정비',
   equipment: '설비투자',
   card: '카드대금',
@@ -7,7 +8,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 }
 
 const CATEGORY_COLOR: Record<string, string> = {
-  ingredients: 'text-amber-600 bg-amber-50',
+  ingredients_cash: 'text-amber-600 bg-amber-50',
+  ingredients_card: 'text-amber-500 bg-amber-50/60',
   fixed: 'text-gray-600 bg-gray-100',
   equipment: 'text-sky-600 bg-sky-50',
   card: 'text-red-500 bg-red-50',
@@ -24,7 +26,7 @@ interface ExpenseItemListProps {
   data: Record<string, ExpenseItem[]>
 }
 
-const SHOW_CATEGORIES = ['ingredients', 'labor', 'fixed', 'equipment', 'card']
+const SHOW_CATEGORIES = ['ingredients_cash', 'ingredients_card', 'labor', 'fixed', 'equipment', 'card']
 
 export default function ExpenseItemList({ data }: ExpenseItemListProps) {
   return (

@@ -3,7 +3,8 @@
 import { useState } from 'react'
 
 const CATEGORY_OPTIONS_EXPENSE = [
-  { value: 'ingredients', label: '재료비' },
+  { value: 'ingredients_cash', label: '재료비(현금)' },
+  { value: 'ingredients_card', label: '재료비(카드)' },
   { value: 'labor', label: '인건비' },
   { value: 'fixed', label: '고정비' },
   { value: 'equipment', label: '설비투자' },
@@ -14,16 +15,6 @@ const CATEGORY_OPTIONS_EXPENSE = [
 const CATEGORY_OPTIONS_INCOME = [
   { value: 'income', label: '수입' },
 ]
-
-const CATEGORY_LABEL: Record<string, string> = {
-  income: '수입',
-  ingredients: '재료비',
-  labor: '인건비',
-  fixed: '고정비',
-  equipment: '설비투자',
-  card: '카드대금',
-  excluded: '제외',
-}
 
 export interface PreviewRow {
   date: string
