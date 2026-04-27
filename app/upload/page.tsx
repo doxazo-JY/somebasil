@@ -35,21 +35,35 @@ export default async function UploadPage({ searchParams }: PageProps) {
         <p className="text-sm text-gray-400 mt-0.5">파일 업로드 + 자동 분류 결과 재분류</p>
       </div>
 
-      {/* 업로드 영역 — 탭별로 추가 도구 노출 */}
+      {/* 업로드 영역 — 탭별로 추가 도구 노출 (관리 도구는 PC 전용) */}
       <div className="mb-8">
         <UploadSection
           bankExtras={
-            <div className="mt-6">
-              <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-                  거래 재분류
-                </p>
-                <MonthFilter year={year} month={month} />
+            <>
+              <div className="hidden md:block mt-6">
+                <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                    거래 재분류
+                  </p>
+                  <MonthFilter year={year} month={month} />
+                </div>
+                <ReclassifyTable items={allTransactions} />
               </div>
-              <ReclassifyTable items={allTransactions} />
-            </div>
+              <p className="md:hidden mt-6 text-xs text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-lg [word-break:keep-all]">
+                💻 거래 재분류는 PC에서 가능합니다
+              </p>
+            </>
           }
-          menuExtras={<MasterManager products={masterProducts} />}
+          menuExtras={
+            <>
+              <div className="hidden md:block">
+                <MasterManager products={masterProducts} />
+              </div>
+              <p className="md:hidden mt-4 text-xs text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-lg [word-break:keep-all]">
+                💻 메뉴 마스터 관리는 PC에서 가능합니다
+              </p>
+            </>
+          }
         />
       </div>
 

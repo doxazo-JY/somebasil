@@ -159,19 +159,29 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 탭 */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        {(['daily', 'bank', 'menu'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); setPreview(null); setMessage(null) }}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t === 'daily' ? '📋 일별 매출' : t === 'bank' ? '🏦 통장 거래내역' : '🍽️ 메뉴 마스터'}
-          </button>
-        ))}
+      {/* 탭 — 모바일은 짧은 라벨 (일별/통장/메뉴), 데스크탑은 풀 라벨 */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit max-w-full">
+        {(['daily', 'bank', 'menu'] as Tab[]).map((t) => {
+          const short = t === 'daily' ? '일별' : t === 'bank' ? '통장' : '메뉴'
+          const full =
+            t === 'daily'
+              ? '📋 일별 매출'
+              : t === 'bank'
+                ? '🏦 통장 거래내역'
+                : '🍽️ 메뉴 마스터'
+          return (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setPreview(null); setMessage(null) }}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <span className="sm:hidden">{short}</span>
+              <span className="hidden sm:inline">{full}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* 파일 업로드 */}

@@ -28,18 +28,26 @@
 - 페이지마다 같은 차트 구조 반복 금지
 - 불필요한 애니메이션 금지
 
-## 페이지 구성
-- / (대시보드)
-- /수입
-- /지출
-- /이익
-- /직원
-- /직원/[id]
-- /업로드
-- /설정
+## 페이지 구성 (3개 그룹 IA — 4/25, 4/27 정착)
 
-## 사이드바 메뉴 (순서 고정)
-대시보드 / 수입 / 지출 / 이익 / 직원 / 업로드 / 설정
+**운영** (매일/매주):
+- `/` — 대시보드 (월간 콕핏)
+- `/weekly` — 주간 (목요일 보고용)
+
+**결산** (월말/분기):
+- `/profit` — 손익 (YTD)
+- `/expenses` — 지출
+- `/menu` — 메뉴 분석 (히트맵 / 죽은 메뉴)
+
+**관리**:
+- `/upload` — 업로드 + 거래 재분류(통장 탭) + 마스터 관리(메뉴 탭)
+- `/staff` — 직원 (현재 placeholder, 추후 구현)
+- `/settings` — 설정 (대표 토글, 수동 조정)
+
+## 사이드바 (3개 그룹) + PageTabs (그룹 내)
+- 사이드바: 운영 / 결산 / 관리
+- 페이지 상단 PageTabs로 그룹 내 이동
+- 사이드바·PageTabs 모두 `?year=&month=` 쿼리 유지 (기간 컨텍스트 이어감)
 
 ## 컴포넌트 구조 원칙
 - 페이지당 컴포넌트 분리 철저히
@@ -72,10 +80,20 @@
 - ⚠️ 지출 집계에 사용하지 않음 — "이번 달 이 직원한테 얼마 줘야 하나" 계산 전용
 - 실제 인건비 지출은 통장 거래내역 업로드 시 monthly_expenses.labor로 기록됨
 
-### daily_sales — 일별 카테고리별 매출 (POS)
-- id, date, category, amount, created_at
-- category: 'coffee' | 'matcha' | 'beverage' | 'dessert' 등
-- UNIQUE (date, category)
+### daily_sales — POS 상품 라인 단위 매출
+- id, date, order_id, line_no, product_name, category, quantity, amount, order_time, source, created_at
+- category: 'coffee' | 'drip_coffee' | 'dutch_coffee' | 'matcha' | 'beverage' | 'ade' | 'tea' | 'dessert' | 'season' | 'etc'
+- source: 'pos' (POS 업로드) | 'bank' (레거시, 4/22 이후 미사용)
+- UNIQUE (date, order_id, line_no, source)
+
+### products — 메뉴 마스터 (POS export)
+- id (text PK = POS ID), name, price, is_active, updated_at
+- 죽은 메뉴 분석 / 메뉴 카탈로그 정의
+
+### product_aliases — POS 이름 ↔ 마스터 수동 매핑
+- id, product_id (→products), pos_name (UNIQUE), created_at
+- 자동 정규화로 매칭 안 되는 케이스용
+- 매칭 시 alias가 자동 정규화보다 우선
 
 ### memos — 월별 메모
 - id, year, month, content, created_at, updated_at
@@ -83,7 +101,15 @@
 
 ### upload_history — 업로드 히스토리
 - id, file_name, file_type, status, uploaded_at
-- file_type: 'daily_sales' | 'monthly' | 'bank_transaction'
+- file_type: 'daily_sales' | 'bank_transaction' | 'menu'
+
+### system_settings — 범용 키/값 설정
+- key (text PK), value (jsonb), updated_at
+- 예: `include_owner_personal` (대표 개인 거래 포함 토글)
+
+### manual_adjustments — 수동 수입/지출 조정
+- id, date, type ('income' | 'expense'), direction ('add' | 'subtract'), amount, memo
+- 자동 분류 불가능한 거래를 월별 집계에 가감
 
 ### parsing_rules — 통장 거래내역 파싱 규칙
 - id, keyword, category, created_at
@@ -94,8 +120,8 @@
   - 전기세/지방세/세금 키워드 → 고정비 (fixed)
   - 나머지 출금 → 카드대금 (card, 기본값)
 
-## 직원 직책
-점장 / 매니저 / 알바생 (드롭다운 선택)
+## 직원 직책 (현재 미구현, 추후 재설계)
+점장 / 매니저 / 알바생
 
 ## 데이터 업로드 방식
 - 일별 매출: POS 엑셀 파일 (YYYYMMDD.xlsx)
@@ -114,10 +140,20 @@
   - "전기세", "세금", "지방세" 등 → 고정비
   - 나머지 출금 → 카드대금 (기본값)
 
-## 현재 작업 단계
-Phase 1 구현 중
-- [ ] Supabase 스키마 생성
-- [x] 대시보드
-- [ ] 수입 / 지출 / 이익 상세
-- [ ] 직원 관리
-- [ ] 데이터 업로드
+## 현재 작업 단계 (4/27 기준)
+
+완성된 영역:
+- [x] 대시보드 콕핏 (InsightBanner / KPI 클릭 / DeficitSignals / 매출 달력 / 메모 / 트렌드)
+- [x] 주간 보고 (`/weekly`)
+- [x] 결산 (`/profit`, `/expenses`, `/menu`)
+- [x] 메뉴 마스터 매칭/청소 시스템 (alias + MasterManager)
+- [x] 업로드 + 재분류 (탭별 분리)
+- [x] 모바일 대응 (콕핏 = 폰 OK, 관리 = PC 전용)
+
+외부 데이터 대기:
+- [ ] 메뉴 원가 룰 (점장 레시피)
+- [ ] 직원/인건비 (회계사 데이터, 현재 placeholder)
+
+축적 후 결정:
+- [ ] 신호등 절대 임계값 (운영 6개월)
+- [ ] InsightBanner 임계값 적정성 점검

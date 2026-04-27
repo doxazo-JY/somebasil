@@ -50,16 +50,19 @@ export default function OwnerToggle({
           </p>
         </div>
         <button
+          type="button"
+          role="switch"
+          aria-checked={value}
           onClick={toggle}
           disabled={saving}
-          className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${
-            value ? 'bg-[#1a5c3a]' : 'bg-gray-200'
-          } disabled:opacity-50`}
-          aria-pressed={value}
+          className={`relative inline-flex shrink-0 h-6 w-11 items-center rounded-full transition-colors duration-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#1a5c3a]/30 ${
+            value ? 'bg-[#1a5c3a]' : 'bg-gray-300'
+          }`}
         >
           <span
-            className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-              value ? 'translate-x-5' : 'translate-x-0.5'
+            aria-hidden
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${
+              value ? 'translate-x-[22px]' : 'translate-x-0.5'
             }`}
           />
         </button>

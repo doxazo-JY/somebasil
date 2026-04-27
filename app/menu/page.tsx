@@ -8,6 +8,7 @@ import DeadMenuList from '@/components/menu/DeadMenuList'
 import {
   getWeekdayHourHeatmap,
   getDeadMenus,
+  getMasterProducts,
 } from '@/lib/supabase/queries/menu'
 
 // 배포 환경에서 캐시 회피 — 매 요청마다 최신 데이터 로드
@@ -71,21 +72,51 @@ export default async function MenuAnalysisPage({ searchParams }: PageProps) {
   const heatmapSinceStr = heatmapSinceDate(heatmapRange)
 
   // 죽은 메뉴도 같은 기간 적용 — selector 한 번 바꾸면 둘 다 갱신
-  const [heatmap, dead] = await Promise.all([
+  const [heatmap, dead, masters] = await Promise.all([
     getWeekdayHourHeatmap(heatmapSinceStr),
     getDeadMenus(heatmapSinceStr, { limit: 30 }),
+    getMasterProducts(),
   ])
 
   const rangeLabel = RANGE_LABELS[heatmapRange]
 
+  // 첫 줄 요약 — 활성 / 한 번도 안 팔린 / 기간 내 0건
+  const activeCount = masters.filter((m) => m.is_active).length
+  const neverSoldCount = masters.filter(
+    (m) => m.is_active && m.matches.length === 0,
+  ).length
+  const periodZeroCount = dead.filter((d) => d.quantity === 0).length
+
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <PageTabs group="settlement" />
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">메뉴 분석</h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">
           요일·시간 패턴 / 죽은 메뉴 — 메뉴판 정리·발주·스케줄 의사결정용
         </p>
+      </div>
+
+      {/* 첫 줄 요약 — 활성 / 한 번도 안 팔린 / 기간 내 0건 */}
+      <div className="bg-white rounded-xl border border-gray-100 px-5 py-3 mb-6 grid grid-cols-2 gap-x-3 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 text-sm [word-break:keep-all]">
+        <span className="text-gray-500">
+          활성 메뉴 <span className="text-gray-700 font-medium">{activeCount}개</span>
+        </span>
+        <span className="hidden sm:inline text-gray-200" aria-hidden>|</span>
+        {neverSoldCount > 0 ? (
+          <span className="text-red-500 font-medium">
+            한 번도 안 팔린 메뉴 {neverSoldCount}개
+          </span>
+        ) : (
+          <span className="text-[#1a5c3a] font-medium">
+            ✓ 모든 활성 메뉴 판매 이력 있음
+          </span>
+        )}
+        <span className="hidden sm:inline text-gray-200" aria-hidden>|</span>
+        <span className="text-gray-500">
+          {rangeLabel} 0건{' '}
+          <span className="text-gray-700 font-medium">{periodZeroCount}개</span>
+        </span>
       </div>
 
       {/* 히트맵 + 죽은 메뉴 (2열) */}

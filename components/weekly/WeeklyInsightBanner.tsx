@@ -87,7 +87,7 @@ export default function WeeklyInsightBanner({
   const gap = Math.abs(profit)
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 px-5 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+    <div className="bg-white rounded-xl border border-gray-100 px-5 py-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 text-sm">
       {/* 주 라벨 */}
       <span className="text-gray-500 [word-break:keep-all]">
         <span className="text-gray-700 font-medium">
@@ -101,7 +101,7 @@ export default function WeeklyInsightBanner({
       {/* 손익분기 갭 */}
       {hasExpenseData && (
         <>
-          <span className="text-gray-200" aria-hidden>
+          <span className="hidden sm:inline text-gray-200" aria-hidden>
             |
           </span>
           {isProfit ? (
@@ -119,7 +119,7 @@ export default function WeeklyInsightBanner({
       {/* 가장 악화된 변화 (전주比) */}
       {worst && (
         <>
-          <span className="text-gray-200" aria-hidden>
+          <span className="hidden sm:inline text-gray-200" aria-hidden>
             |
           </span>
           <span
@@ -139,7 +139,7 @@ export default function WeeklyInsightBanner({
       {/* 매출 데이터 없을 때 */}
       {!hasExpenseData && income === 0 && (
         <>
-          <span className="text-gray-200" aria-hidden>
+          <span className="hidden sm:inline text-gray-200" aria-hidden>
             |
           </span>
           <span className="text-gray-400">데이터 없음</span>

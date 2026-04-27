@@ -28,9 +28,13 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const year = Number(params.year ?? now.getFullYear())
   const month = Number(params.month ?? now.getMonth() + 1)
 
-  const [summary, expensesByCategory, trend, expenseItems, suppliers] = await Promise.all([
+  const prevMonth = month === 1 ? 12 : month - 1
+  const prevYear = month === 1 ? year - 1 : year
+
+  const [summary, expensesByCategory, prevExpensesByCategory, trend, expenseItems, suppliers] = await Promise.all([
     getMonthlySummary(year, month),
     getMonthlyExpensesByCategory(year, month),
+    getMonthlyExpensesByCategory(prevYear, prevMonth),
     getYearlyExpenseTrend(year),
     getMonthlyExpenseItems(year, month),
     getSupplierTotals(year, month),
@@ -51,18 +55,33 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     (s, d) => s + d.ingredients_cash + d.ingredients_card + d.labor + d.fixed + d.equipment + d.card, 0
   )
 
-  // 첫 줄 요약 — 가장 큰 지출 카테고리 식별 (지출 액수 내림차순)
-  const sortedCats = [
-    { label: '인건비', amount: labor },
-    { label: '재료비', amount: ingredients },
-    { label: '고정비', amount: fixed },
-    { label: '카드대금', amount: card },
-    { label: '설비투자', amount: equipment },
-  ]
-    .filter((c) => c.amount > 0)
-    .sort((a, b) => b.amount - a.amount)
-  const topCat = sortedCats[0]
-  const secondCat = sortedCats[1]
+  // 첫 줄 요약 — 전월比 변화 액션 인사이트
+  // 1) 가장 큰 지출 (절대 1위)
+  // 2) 전월比 가장 많이 증가한 카테고리 (액션 대상)
+  const prevLabor = prevExpensesByCategory.labor ?? 0
+  const prevIngredients =
+    (prevExpensesByCategory.ingredients_cash ?? 0) +
+    (prevExpensesByCategory.ingredients_card ?? 0)
+  const prevFixed = prevExpensesByCategory.fixed ?? 0
+  const prevCard = prevExpensesByCategory.card ?? 0
+  const prevEquipment = prevExpensesByCategory.equipment ?? 0
+
+  const cats = [
+    { label: '인건비', amount: labor, prev: prevLabor },
+    { label: '재료비', amount: ingredients, prev: prevIngredients },
+    { label: '고정비', amount: fixed, prev: prevFixed },
+    { label: '카드대금', amount: card, prev: prevCard },
+    { label: '설비투자', amount: equipment, prev: prevEquipment },
+  ].filter((c) => c.amount > 0)
+
+  const topCat = [...cats].sort((a, b) => b.amount - a.amount)[0]
+
+  // 전월比 증가량(원) 가장 큰 카테고리 — 단 의미 있는 변화만
+  const MIN_DELTA_WON = 100000 // 10만원 미만 증가는 노이즈로 간주
+  const biggestIncrease = [...cats]
+    .map((c) => ({ ...c, delta: c.amount - c.prev }))
+    .filter((c) => c.delta >= MIN_DELTA_WON && c.prev > 0)
+    .sort((a, b) => b.delta - a.delta)[0]
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
@@ -76,9 +95,28 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
         <MonthFilter year={year} month={month} />
       </div>
 
-      {/* 첫 줄 요약 — 가장 큰 지출 카테고리 */}
+      {/* 첫 줄 요약 — 액션 인사이트 (전월比 가장 큰 증가) + 가장 큰 지출 */}
       {topCat && (
-        <div className="bg-white rounded-xl border border-gray-100 px-5 py-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm [word-break:keep-all]">
+        <div className="bg-white rounded-xl border border-gray-100 px-5 py-3 mb-4 grid grid-cols-1 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 text-sm [word-break:keep-all]">
+          {biggestIncrease ? (
+            <span className="text-amber-600 font-medium">
+              ⚠ 전월比{' '}
+              <span className="text-gray-800">
+                {biggestIncrease.label} +{formatManwon(biggestIncrease.delta)}
+              </span>
+              <span className="text-gray-400 font-normal ml-1.5">
+                ({formatManwon(biggestIncrease.prev)} → {formatManwon(biggestIncrease.amount)},{' '}
+                +{((biggestIncrease.delta / biggestIncrease.prev) * 100).toFixed(0)}%)
+              </span>
+            </span>
+          ) : (
+            <span className="text-[#1a5c3a] font-medium">
+              ✓ 전월比 안정적
+            </span>
+          )}
+          <span className="hidden sm:inline text-gray-200" aria-hidden>
+            |
+          </span>
           <span className="text-gray-500">
             <span className="text-gray-400">💸</span> 가장 큰 지출{' '}
             <span className="text-gray-700 font-medium">
@@ -90,24 +128,6 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
               </span>
             )}
           </span>
-          {secondCat && (
-            <>
-              <span className="text-gray-200" aria-hidden>
-                |
-              </span>
-              <span className="text-gray-500">
-                2위{' '}
-                <span className="text-gray-700 font-medium">
-                  {secondCat.label} {formatManwon(secondCat.amount)}
-                </span>
-                {income > 0 && (
-                  <span className="text-gray-400 ml-1.5">
-                    ({((secondCat.amount / income) * 100).toFixed(0)}%)
-                  </span>
-                )}
-              </span>
-            </>
-          )}
         </div>
       )}
 

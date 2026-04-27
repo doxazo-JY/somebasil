@@ -53,6 +53,19 @@ export async function getDailySales(year: number, month: number, maxDay?: number
   return data
 }
 
+// 단일 일자 매출 합계 (어제/전주同曜 비교용)
+export async function getSalesTotalForDate(dateStr: string): Promise<number> {
+  const supabase = createServerClient()
+  const data = await fetchAllRows<{ amount: number }>((from, to) =>
+    supabase
+      .from('daily_sales')
+      .select('amount')
+      .eq('date', dateStr)
+      .range(from, to),
+  )
+  return data.reduce((s, r) => s + (r.amount ?? 0), 0)
+}
+
 // 선택한 월 카테고리별 매출 합계 (도넛차트용)
 export async function getMonthlySalesByCategory(year: number, month: number) {
   const data = await getDailySales(year, month)

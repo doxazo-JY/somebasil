@@ -19,8 +19,10 @@ interface InsightBannerProps {
   fixedPrev: number
   cardCurr: number
   cardPrev: number
-  /** 통장 거래내역 마지막 업로드 ISO timestamp (없으면 null) */
-  lastBankUploadAt: string | null
+  /** 어제 매출 (KST) */
+  yesterdayIncome?: number
+  /** 어제와 같은 요일 1주 전 매출 (전주同曜비 계산용) */
+  prevWeekSameDayIncome?: number
 }
 
 const ALERT_THRESHOLD = 3
@@ -47,18 +49,6 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate()
 }
 
-// 업로드 신선도 — 며칠 전인지 (KST 자정 기준)
-function daysSinceUpload(uploadedAt: string | null): number | null {
-  if (!uploadedAt) return null
-  const uploaded = new Date(uploadedAt)
-  // KST 자정으로 정렬해서 일 단위 차이 계산
-  const kstNow = new Date(Date.now() + 9 * 3600 * 1000)
-  const kstUploaded = new Date(uploaded.getTime() + 9 * 3600 * 1000)
-  const today0 = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate())
-  const up0 = Date.UTC(kstUploaded.getUTCFullYear(), kstUploaded.getUTCMonth(), kstUploaded.getUTCDate())
-  return Math.max(0, Math.floor((today0 - up0) / 86400000))
-}
-
 export default function InsightBanner({
   year,
   month,
@@ -72,7 +62,8 @@ export default function InsightBanner({
   fixedPrev,
   cardCurr,
   cardPrev,
-  lastBankUploadAt,
+  yesterdayIncome,
+  prevWeekSameDayIncome,
 }: InsightBannerProps) {
   const today = getKSTDate()
   const isPartial = today.year === year && today.month === month
@@ -115,14 +106,16 @@ export default function InsightBanner({
   const gap = Math.abs(profit)
   const hasFinancials = income > 0 || expense > 0
 
-  // 통장 업로드 신선도 — 보통 일주일 단위 업로드라 8일부터 알림
-  const bankDaysAgo = daysSinceUpload(lastBankUploadAt)
-  const showBankReminder = bankDaysAgo !== null && bankDaysAgo >= 8
-  const bankReminderColor =
-    bankDaysAgo !== null && bankDaysAgo >= 14 ? 'text-red-500' : 'text-amber-600'
+  // 어제 매출 + 전주同曜比 (현재 월 보고 있을 때만 의미)
+  const showYesterday =
+    isPartial && yesterdayIncome !== undefined && yesterdayIncome > 0
+  const yesterdayDelta =
+    showYesterday && prevWeekSameDayIncome && prevWeekSameDayIncome > 0
+      ? ((yesterdayIncome - prevWeekSameDayIncome) / prevWeekSameDayIncome) * 100
+      : null
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 px-5 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+    <div className="bg-white rounded-xl border border-gray-100 px-5 py-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 text-sm">
       {/* 부분월 컨텍스트 */}
       <span className="text-gray-500 [word-break:keep-all]">
         {isPartial ? (
@@ -142,7 +135,7 @@ export default function InsightBanner({
       {/* 손익분기 갭 */}
       {hasFinancials && (
         <>
-          <span className="text-gray-200" aria-hidden>
+          <span className="hidden sm:inline text-gray-200" aria-hidden>
             |
           </span>
           {isProfit ? (
@@ -157,25 +150,34 @@ export default function InsightBanner({
         </>
       )}
 
-      {/* 통장 업로드 신선도 — 3일 이상 됐을 때만 */}
-      {showBankReminder && (
+      {/* 어제 매출 + 전주同曜比 — 점장 매일 첫 질문 "어제 매출 어땠나" */}
+      {showYesterday && (
         <>
-          <span className="text-gray-200" aria-hidden>
+          <span className="hidden sm:inline text-gray-200" aria-hidden>
             |
           </span>
-          <Link
-            href="/upload"
-            className={`font-medium [word-break:keep-all] hover:underline ${bankReminderColor}`}
-          >
-            📤 통장 {bankDaysAgo}일 전 업로드 →
-          </Link>
+          <span className="text-gray-500 [word-break:keep-all]">
+            어제{' '}
+            <span className="text-gray-700 font-medium">{fmt(yesterdayIncome!)}</span>
+            {yesterdayDelta !== null && (
+              <span
+                className={`ml-1.5 ${
+                  yesterdayDelta >= 0 ? 'text-[#1a5c3a]' : 'text-red-400'
+                }`}
+              >
+                {yesterdayDelta >= 0 ? '▲' : '▼'}
+                {Math.abs(yesterdayDelta).toFixed(1)}%
+              </span>
+            )}
+            <span className="text-gray-400 text-[11px] ml-1">전주同曜比</span>
+          </span>
         </>
       )}
 
       {/* 가장 악화된 신호 */}
       {worst && (
         <>
-          <span className="text-gray-200" aria-hidden>
+          <span className="hidden sm:inline text-gray-200" aria-hidden>
             |
           </span>
           {worst.href ? (

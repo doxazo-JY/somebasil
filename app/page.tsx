@@ -14,13 +14,13 @@ import {
   getAllTimeSummary,
   getMonthlySalesByCategory,
   getMemo,
-  getLatestUploadDate,
 } from '@/lib/supabase/queries/dashboard'
 import { getMonthlyExpensesByCategory } from '@/lib/supabase/queries/expenses'
 import {
   getMonthlyAOV,
   getMonthlyProductSales,
   getDailySales,
+  getSalesTotalForDate,
 } from '@/lib/supabase/queries/income'
 
 export const dynamic = 'force-dynamic'
@@ -37,6 +37,17 @@ function formatManwon(amount: number) {
 function calcChange(current: number, prev: number | undefined) {
   if (!prev || prev === 0) return undefined
   return ((current - prev) / Math.abs(prev)) * 100
+}
+
+// KST 기준 N일 전 날짜 (YYYY-MM-DD)
+function kstDateOffset(daysAgo: number): string {
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  kst.setUTCDate(kst.getUTCDate() - daysAgo)
+  const y = kst.getUTCFullYear()
+  const m = String(kst.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(kst.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
@@ -62,7 +73,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     topProducts,
     prevTopProducts,
     dailySales,
-    lastBankUploadAt,
+    yesterdayIncome,
+    prevWeekSameDayIncome,
   ] = await Promise.all([
     getMonthlySummary(year, month),
     getMonthlySummary(prevYear, prevMonth),
@@ -78,7 +90,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     getMonthlyProductSales(year, month),
     getMonthlyProductSales(prevYear, prevMonth),
     getDailySales(year, month),
-    getLatestUploadDate('bank_transaction'),
+    getSalesTotalForDate(kstDateOffset(1)),
+    getSalesTotalForDate(kstDateOffset(8)),
   ])
 
   const cumIncome = allTime.reduce((s, d) => s + d.income, 0)
@@ -118,7 +131,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           fixedPrev={prevExpenses.fixed ?? 0}
           cardCurr={expenses.card ?? 0}
           cardPrev={prevExpenses.card ?? 0}
-          lastBankUploadAt={lastBankUploadAt}
+          yesterdayIncome={yesterdayIncome}
+          prevWeekSameDayIncome={prevWeekSameDayIncome}
         />
       </div>
 

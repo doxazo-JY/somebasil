@@ -83,14 +83,14 @@ export default function ManualAdjustments({ items }: Props) {
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-gray-800">수동 조정</p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
             자동 분류가 안 된 수입·지출을 월별 집계에 수동으로 가감
           </p>
         </div>
         {!adding && (
           <button
             onClick={() => setAdding(true)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] transition-colors"
+            className="text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] transition-colors whitespace-nowrap shrink-0"
           >
             + 추가
           </button>
