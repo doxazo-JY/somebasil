@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 interface MonthData {
   month: number
   income: number
@@ -10,6 +12,8 @@ interface MonthlyBreakdownTableProps {
   year: number
   /** 하이라이트할 월 (옵션) */
   selectedMonth?: number
+  /** 월별 메모 (대시보드에서 입력한 한 줄 코멘트) */
+  memos?: Record<number, string>
 }
 
 function fmt(v: number) {
@@ -21,7 +25,7 @@ function margin(profit: number, income: number) {
   return `${((profit / income) * 100).toFixed(1)}%`
 }
 
-export default function MonthlyBreakdownTable({ data, selectedMonth, year }: MonthlyBreakdownTableProps) {
+export default function MonthlyBreakdownTable({ data, selectedMonth, year, memos }: MonthlyBreakdownTableProps) {
   // 데이터 있는 월만 표시 (매출 또는 지출 존재)
   const rows = data
     .filter((d) => d.income > 0 || d.total_expense > 0)
@@ -50,23 +54,35 @@ export default function MonthlyBreakdownTable({ data, selectedMonth, year }: Mon
         <tbody className="divide-y divide-gray-50">
           {rows.map((r) => {
             const isSelected = r.month === selectedMonth
+            const memo = memos?.[r.month]
             return (
               <tr
                 key={r.month}
                 className={`${isSelected ? 'bg-[#1a5c3a]/5' : 'hover:bg-gray-50/50'}`}
               >
-                <td className={`px-6 py-2.5 font-medium ${isSelected ? 'text-[#1a5c3a]' : 'text-gray-700'}`}>
-                  {r.month}월
-                  {isSelected && <span className="ml-1.5 text-[10px] text-[#1a5c3a]">▶</span>}
+                <td className={`px-6 py-2.5 font-medium align-top ${isSelected ? 'text-[#1a5c3a]' : 'text-gray-700'}`}>
+                  <Link
+                    href={`/?year=${year}&month=${r.month}`}
+                    className="hover:underline"
+                    title="대시보드에서 이 달 자세히 보기"
+                  >
+                    {r.month}월
+                    {isSelected && <span className="ml-1.5 text-[10px] text-[#1a5c3a]">▶</span>}
+                  </Link>
+                  {memo && (
+                    <p className="text-[10px] text-gray-400 font-normal mt-0.5 max-w-[180px] [word-break:keep-all] line-clamp-2">
+                      {memo}
+                    </p>
+                  )}
                 </td>
-                <td className="px-4 py-2.5 text-right text-gray-600">{fmt(r.income)}</td>
-                <td className="px-4 py-2.5 text-right text-gray-600">{fmt(r.total_expense)}</td>
-                <td className={`px-4 py-2.5 text-right font-semibold ${
+                <td className="px-4 py-2.5 text-right text-gray-600 align-top">{fmt(r.income)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-600 align-top">{fmt(r.total_expense)}</td>
+                <td className={`px-4 py-2.5 text-right font-semibold align-top ${
                   r.profit >= 0 ? 'text-[#1a5c3a]' : 'text-red-500'
                 }`}>
                   {fmt(r.profit)}
                 </td>
-                <td className={`px-4 py-2.5 text-right ${
+                <td className={`px-4 py-2.5 text-right align-top ${
                   r.profit >= 0 ? 'text-[#1a5c3a]' : 'text-red-400'
                 }`}>
                   {margin(r.profit, r.income)}

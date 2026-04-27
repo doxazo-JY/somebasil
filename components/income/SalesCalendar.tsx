@@ -31,9 +31,31 @@ function getHeatColor(amount: number, max: number): string {
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
+// 비정상 낮은 매출 임계 — 영업일 평균 대비 60% 미만이면 빨간 점
+const LOW_THRESHOLD = 0.6
+
+// KST 오늘 날짜 (오늘은 부분일자라 비정상 판정 제외)
+function getKSTTodayKey(): string {
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  const y = kst.getUTCFullYear()
+  const m = String(kst.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(kst.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export default function SalesCalendar({ data, year, month }: SalesCalendarProps) {
   const byDate = aggregateByDate(data)
   const max = Math.max(...Object.values(byDate), 1)
+
+  // 영업일 평균(0원 제외) — 비정상 판정 기준
+  const businessDays = Object.values(byDate).filter((v) => v > 0)
+  const avg =
+    businessDays.length > 0
+      ? businessDays.reduce((s, v) => s + v, 0) / businessDays.length
+      : 0
+  const lowCutoff = avg * LOW_THRESHOLD
+  const todayKey = getKSTTodayKey()
 
   // 해당 월의 1일 요일과 마지막 날
   const firstDay = new Date(year, month - 1, 1).getDay()
@@ -48,9 +70,24 @@ export default function SalesCalendar({ data, year, month }: SalesCalendarProps)
   // 7의 배수로 맞추기
   while (cells.length % 7 !== 0) cells.push(null)
 
+  // 비정상 낮은 날 카운트 (안내 문구용)
+  const lowDays = Object.entries(byDate).filter(
+    ([k, v]) => v > 0 && v < lowCutoff && k !== todayKey,
+  ).length
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
-      <p className="text-sm font-semibold text-gray-700 mb-4">{month}월 일별 매출</p>
+      <div className="flex items-baseline justify-between mb-4 flex-wrap gap-2">
+        <p className="text-sm font-semibold text-gray-700">{month}월 일별 매출</p>
+        {avg > 0 && (
+          <p className="text-[11px] text-gray-400 [word-break:keep-all]">
+            영업일 평균 {Math.round(avg / 10000)}만
+            {lowDays > 0 && (
+              <span className="text-red-500 ml-2">● 평소比 60% 미만 {lowDays}일</span>
+            )}
+          </p>
+        )}
+      </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs">
         {DAY_LABELS.map((d) => (
           <div key={d} className="py-1 text-gray-400 font-medium">
@@ -63,11 +100,26 @@ export default function SalesCalendar({ data, year, month }: SalesCalendarProps)
           const amount = byDate[key] ?? 0
           const heatClass = amount > 0 ? getHeatColor(amount, max) : 'text-gray-300'
 
+          // 비정상 낮음 — 영업일 평균 60% 미만 (오늘은 제외)
+          const isAbnormalLow =
+            amount > 0 && amount < lowCutoff && key !== todayKey
+
           return (
             <div
               key={key}
-              className={`rounded-lg py-2 flex flex-col items-center gap-0.5 ${heatClass}`}
+              className={`relative rounded-lg py-2 flex flex-col items-center gap-0.5 ${heatClass}`}
+              title={
+                isAbnormalLow
+                  ? `평소比 ${Math.round((amount / avg) * 100)}% — 비정상 낮음`
+                  : undefined
+              }
             >
+              {isAbnormalLow && (
+                <span
+                  className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500"
+                  aria-label="비정상 낮은 매출"
+                />
+              )}
               <span className="font-medium">{date}</span>
               {amount > 0 && (
                 <span className="text-[10px] opacity-80">{Math.round(amount / 10000)}만</span>

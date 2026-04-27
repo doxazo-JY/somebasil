@@ -4,14 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import FileDropZone from './FileDropZone'
 import PreviewTable, { type PreviewRow } from './PreviewTable'
+import MenuPreviewTable from './MenuPreviewTable'
 import type { BankRow } from '@/app/api/upload/bank/route'
 import type { DailySalesRow } from '@/app/api/upload/daily-sales/route'
+import type { MenuRow } from '@/app/api/upload/menu/route'
 
-type Tab = 'daily' | 'bank'
+type Tab = 'daily' | 'bank' | 'menu'
 
 type DailyPreview = { type: 'daily'; rows: DailySalesRow[] }
 type BankPreview = { type: 'bank'; rows: PreviewRow[]; originals: BankRow[] }
-type PreviewState = DailyPreview | BankPreview
+type MenuPreview = { type: 'menu'; rows: MenuRow[] }
+type PreviewState = DailyPreview | BankPreview | MenuPreview
 
 function bankRowToPreview(row: BankRow): PreviewRow {
   return {
@@ -23,7 +26,14 @@ function bankRowToPreview(row: BankRow): PreviewRow {
   }
 }
 
-export default function UploadSection() {
+interface UploadSectionProps {
+  /** 통장 탭에서만 노출할 추가 컨텐츠 (재분류 테이블 등) */
+  bankExtras?: React.ReactNode
+  /** 메뉴 마스터 탭에서만 노출할 추가 컨텐츠 (마스터 관리 등) */
+  menuExtras?: React.ReactNode
+}
+
+export default function UploadSection({ bankExtras, menuExtras }: UploadSectionProps = {}) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('daily')
   const [loading, setLoading] = useState(false)
@@ -40,8 +50,12 @@ export default function UploadSection() {
     const formData = new FormData()
     formData.append('file', file)
 
-    const endpoint = tab === 'daily' ? '/api/upload/daily-sales' : '/api/upload/bank'
-    const res = await fetch(endpoint, { method: 'POST', body: formData })
+    const endpointMap = {
+      daily: '/api/upload/daily-sales',
+      bank: '/api/upload/bank',
+      menu: '/api/upload/menu',
+    } as const
+    const res = await fetch(endpointMap[tab], { method: 'POST', body: formData })
     const json = await res.json()
 
     setLoading(false)
@@ -55,13 +69,34 @@ export default function UploadSection() {
 
     if (tab === 'daily') {
       setPreview({ type: 'daily', rows: json.rows as DailySalesRow[] })
-    } else {
+    } else if (tab === 'bank') {
       const originals = json.rows as BankRow[]
       setPreview({
         type: 'bank',
         rows: originals.map(bankRowToPreview),
         originals,
       })
+    } else {
+      setPreview({ type: 'menu', rows: json.rows as MenuRow[] })
+    }
+  }
+
+  async function handleSaveMenu(rows: MenuRow[]) {
+    setSaving(true)
+    setMessage(null)
+    const res = await fetch('/api/upload/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'menu', rows, filename }),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) {
+      setMessage({ text: json.error ?? '저장 실패', ok: false })
+    } else {
+      setMessage({ text: `저장 완료! ${rows.length}개 메뉴 반영됨.`, ok: true })
+      setPreview(null)
+      router.refresh()
     }
   }
 
@@ -97,6 +132,7 @@ export default function UploadSection() {
       tx_time: orig.tx_time,
       balance_after: orig.balance_after,
       memo: orig.memo,
+      counterpart: orig.counterpart, // 거래처별 누적 매칭용
       income: orig.income,
       expense: orig.expense,
       category: rows[i]?.category ?? orig.category,
@@ -125,7 +161,7 @@ export default function UploadSection() {
     <div className="flex flex-col gap-4">
       {/* 탭 */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        {(['daily', 'bank'] as Tab[]).map((t) => (
+        {(['daily', 'bank', 'menu'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => { setTab(t); setPreview(null); setMessage(null) }}
@@ -133,7 +169,7 @@ export default function UploadSection() {
               tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t === 'daily' ? '📋 일별 매출 파일' : '🏦 통장 거래내역'}
+            {t === 'daily' ? '📋 일별 매출' : t === 'bank' ? '🏦 통장 거래내역' : '🍽️ 메뉴 마스터'}
           </button>
         ))}
       </div>
@@ -144,7 +180,9 @@ export default function UploadSection() {
         hint={
           tab === 'daily'
             ? 'POS 일일매출 엑셀 파일 (기간·단일 모두 가능)'
-            : '하나은행 거래내역 엑셀 파일'
+            : tab === 'bank'
+              ? '하나은행 거래내역 엑셀 파일'
+              : 'POS 메뉴 마스터 엑셀 (5컬럼: ID·Y/N·명칭·단가)'
         }
         onFile={handleFile}
         loading={loading}
@@ -172,6 +210,18 @@ export default function UploadSection() {
           saving={saving}
         />
       )}
+      {preview?.type === 'menu' && (
+        <MenuPreviewTable
+          rows={preview.rows}
+          saving={saving}
+          onSave={() => handleSaveMenu(preview.rows)}
+        />
+      )}
+
+      {/* 통장 탭 전용 추가 컨텐츠 (재분류 테이블 등) */}
+      {tab === 'bank' && bankExtras && <div className="mt-4">{bankExtras}</div>}
+      {/* 메뉴 탭 전용 추가 컨텐츠 (마스터 관리 등) */}
+      {tab === 'menu' && menuExtras && <div className="mt-4">{menuExtras}</div>}
     </div>
   )
 }

@@ -1,9 +1,9 @@
 import PageTabs from '@/components/ui/PageTabs'
 import WeekSelector from '@/components/weekly/WeekSelector'
+import WeeklyInsightBanner from '@/components/weekly/WeeklyInsightBanner'
 import WeeklyKPICards from '@/components/weekly/WeeklyKPICards'
 import DailyBreakdownChart from '@/components/weekly/DailyBreakdownChart'
 import WeeklyCategoryMix from '@/components/weekly/WeeklyCategoryMix'
-import WeeklyExpenseBreakdown from '@/components/weekly/WeeklyExpenseBreakdown'
 import TopProductsCard from '@/components/income/TopProductsCard'
 import {
   getWeekDetail,
@@ -99,7 +99,7 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
-      <PageTabs group="overview" />
+      <PageTabs group="operations" />
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
@@ -111,6 +111,32 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
         <WeekSelector
           options={weekOptions}
           currentWeekStart={targetWeekOption.weekStart}
+        />
+      </div>
+
+      {/* 첫 인사이트 한 줄 — 주 라벨 / 손익분기 갭 / 가장 큰 악화 */}
+      <div className="mb-4">
+        <WeeklyInsightBanner
+          weekStart={detail.weekStart}
+          weekEnd={detail.weekEnd}
+          income={detail.income}
+          expense={detail.expense}
+          profit={detail.profit}
+          hasExpenseData={detail.hasExpenseData}
+          isPartial={isPartial}
+          daysCount={detail.daily.filter((d) => d.income > 0 || d.orderCount > 0).length}
+          prev={{
+            income: prevDetail.income,
+            expense: prevDetail.expense,
+            profit: prevDetail.profit,
+            aov: prevDetail.aov,
+            orderCount: prevDetail.orderCount,
+            hasExpenseData: prevDetail.hasExpenseData,
+          }}
+          current={{
+            aov: detail.aov,
+            orderCount: detail.orderCount,
+          }}
         />
       </div>
 
@@ -137,15 +163,9 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* 요일별 매출 + 지출 카테고리 비교 (매출/지출 쌍) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 items-start">
+      {/* 요일별 매출 풀폭 — 주간보고 핵심 그림 */}
+      <div className="mb-4">
         <DailyBreakdownChart daily={detail.daily} prevDaily={prevDetail.daily} />
-        <WeeklyExpenseBreakdown
-          current={detail.expenseByCategory}
-          prev={prevDetail.expenseByCategory}
-          currentHasData={detail.hasExpenseData}
-          prevHasData={prevDetail.hasExpenseData}
-        />
       </div>
 
       {/* 카테고리 믹스 + BEST 10 메뉴 (2열) */}

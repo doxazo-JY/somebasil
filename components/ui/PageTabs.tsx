@@ -3,21 +3,24 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
-type GroupKey = 'overview' | 'analysis' | 'admin'
+type GroupKey = 'operations' | 'settlement' | 'admin'
 
 const GROUPS: Record<GroupKey, { label: string; href: string }[]> = {
-  overview: [
-    { label: '월간', href: '/' },
+  // 매일/매주 — 점장 운영용
+  operations: [
+    { label: '대시보드', href: '/' },
     { label: '주간', href: '/weekly' },
-    { label: '종합', href: '/profit' },
   ],
-  analysis: [
-    { label: '매출', href: '/income' },
+  // 월말 결산 — 사장 보고/의사결정
+  settlement: [
+    { label: '손익', href: '/profit' },
     { label: '지출', href: '/expenses' },
-    { label: '메뉴', href: '/menu-analysis' },
+    { label: '메뉴', href: '/menu' },
   ],
+  // 데이터·인력 관리
   admin: [
     { label: '업로드', href: '/upload' },
+    { label: '직원', href: '/staff' },
     { label: '설정', href: '/settings' },
   ],
 }

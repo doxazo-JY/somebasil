@@ -16,6 +16,8 @@ interface RatioItem {
   warnAt: number
   dangerAt: number
   note?: string
+  // 비활성: 계산 방식 미정 — 메뉴별 원가 룰 도입 후 활성
+  pending?: boolean
 }
 
 function getRatioColor(ratio: number, warnAt: number, dangerAt: number) {
@@ -41,12 +43,15 @@ export default function CostRatioCards({ income, labor, ingredients, fixed, card
       note: '업종 평균 25~30%',
     },
     {
+      // 통장 발주액 ÷ 매출은 실제 원가율과 무관 (발주 타이밍 영향 큼)
+      // 메뉴별 원가 룰 도입 후 활성화
       label: '원가율',
-      amount: ingredients,
-      ratio: (ingredients / income) * 100,
+      amount: 0,
+      ratio: 0,
       warnAt: 30,
       dangerAt: 40,
-      note: '하이엔드 기준 30~35%',
+      note: '계산 방식 도입 후 표시',
+      pending: true,
     },
     {
       label: '고정비율',
@@ -69,6 +74,22 @@ export default function CostRatioCards({ income, labor, ingredients, fixed, card
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {items.map((item) => {
+        if (item.pending) {
+          return (
+            <div key={item.label} className="rounded-xl border border-gray-100 border-dashed px-4 py-4 bg-gray-50">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-gray-500 font-medium">{item.label}</p>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-gray-400 bg-white/80">
+                  미설정
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-gray-300">—</p>
+              {item.note && (
+                <p className="text-[10px] text-gray-400 mt-2">{item.note}</p>
+              )}
+            </div>
+          )
+        }
         const color = getRatioColor(item.ratio, item.warnAt, item.dangerAt)
         const label =
           item.ratio >= item.dangerAt ? '높음' :

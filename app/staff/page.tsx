@@ -2,6 +2,9 @@ import { getStaffList, getStaffSalaryGrid } from '@/lib/supabase/queries/staff'
 import StaffTable from '@/components/staff/StaffTable'
 import LaborGrid from '@/components/staff/LaborGrid'
 import AddStaffButton from '@/components/staff/AddStaffButton'
+import PageTabs from '@/components/ui/PageTabs'
+
+export const dynamic = 'force-dynamic'
 
 export default async function StaffPage() {
   const now = new Date()
@@ -17,6 +20,7 @@ export default async function StaffPage() {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full flex flex-col gap-6">
+      <PageTabs group="admin" />
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>

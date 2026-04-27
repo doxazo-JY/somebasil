@@ -88,6 +88,38 @@ export async function getMemo(year: number, month: number) {
   return data
 }
 
+// 가장 최근 업로드 일자 (file_type별)
+// 데이터 신선도 알림용 — 통장 거래내역 며칠 전 업로드인지 등
+export async function getLatestUploadDate(fileType: string): Promise<string | null> {
+  const supabase = createServerClient()
+  const { data, error } = await supabase
+    .from('upload_history')
+    .select('uploaded_at')
+    .eq('file_type', fileType)
+    .order('uploaded_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.uploaded_at ?? null
+}
+
+// 연간 월별 메모 일괄 조회 — /profit 월별 표 코멘트용
+export async function getMemosForYear(year: number): Promise<Record<number, string>> {
+  const supabase = createServerClient()
+  const { data, error } = await supabase
+    .from('memos')
+    .select('month, content')
+    .eq('year', year)
+
+  if (error) throw error
+  const result: Record<number, string> = {}
+  for (const row of data ?? []) {
+    if (row.content) result[row.month] = row.content
+  }
+  return result
+}
+
 // 메모 저장 (upsert)
 export async function upsertMemo(year: number, month: number, content: string) {
   const supabase = createServerClient()

@@ -79,11 +79,7 @@ export default function WeeklyKPICards({
 }: Props) {
   return (
     <>
-      {isPartial && (
-        <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-3 text-xs text-amber-700">
-          ⚠️ 부분 주 — 데이터가 있는 요일까지만 전주와 비교
-        </div>
-      )}
+      {/* 부분주 안내는 WeeklyInsightBanner로 끌어올렸음 */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <ComparisonCard
           label="매출"

@@ -1,4 +1,5 @@
 import type { ProductAgg } from '@/lib/supabase/queries/income'
+import { unitFor } from '@/lib/menu-utils'
 
 const CATEGORY_LABEL: Record<string, string> = {
   coffee: '커피',
@@ -84,7 +85,7 @@ export default function TopProductsCard({
                   <div className="flex items-baseline gap-2">
                     <span className="text-gray-800 truncate">{p.product_name}</span>
                     <span className="text-[11px] text-gray-400 shrink-0">
-                      {p.quantity.toLocaleString()}잔
+                      {p.quantity.toLocaleString()}{unitFor(p.category)}
                     </span>
                   </div>
                   <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">

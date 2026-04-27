@@ -1,4 +1,7 @@
 import type { DeadMenu } from '@/lib/supabase/queries/menu'
+import { unitFor } from '@/lib/menu-utils'
+import MatchMenuButton from './MatchMenuButton'
+import DeactivateMenuButton from './DeactivateMenuButton'
 
 const CATEGORY_LABEL: Record<string, string> = {
   coffee: '커피',
@@ -34,11 +37,11 @@ interface DeadMenuListProps {
 export default function DeadMenuList({ menus, periodLabel }: DeadMenuListProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
-      <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
+      <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
         <p className="text-sm font-semibold text-gray-700 whitespace-nowrap">
           죽은 메뉴 <span className="text-xs text-gray-400 font-normal">({periodLabel})</span>
         </p>
-        <p className="text-[11px] text-gray-400 [word-break:keep-all]">판매량 낮은 순</p>
+        <p className="text-[11px] text-gray-400 [word-break:keep-all]">마지막 판매 오래된 순</p>
       </div>
 
       {menus.length === 0 ? (
@@ -46,6 +49,14 @@ export default function DeadMenuList({ menus, periodLabel }: DeadMenuListProps) 
           기준치 이하 메뉴 없음
         </p>
       ) : (
+        <>
+        {/* 컬럼 헤더 (badge는 variable width이라 헤더 생략) */}
+        <div className="flex items-center gap-2 text-[10px] text-gray-400 tracking-wider px-1 pb-1.5 border-b border-gray-50 mb-2">
+          <span className="flex-1 min-w-0">메뉴</span>
+          <span className="shrink-0 w-10 text-right">판매량</span>
+          <span className="shrink-0 w-14 text-right">매출(원)</span>
+          <span className="shrink-0 w-20 text-right">마지막 판매</span>
+        </div>
         <ul className="flex flex-col gap-2 max-h-[280px] overflow-y-auto pr-1">
           {menus.map((m) => {
             const catLabel = CATEGORY_LABEL[m.category] ?? m.category
@@ -54,7 +65,7 @@ export default function DeadMenuList({ menus, periodLabel }: DeadMenuListProps) 
 
             return (
               <li
-                key={m.product_name}
+                key={`${m.category}|${m.product_name}`}
                 className="flex items-center gap-2 text-sm py-1"
               >
                 <span
@@ -63,33 +74,51 @@ export default function DeadMenuList({ menus, periodLabel }: DeadMenuListProps) 
                   {catLabel}
                 </span>
                 <span className="flex-1 min-w-0 truncate text-gray-800">{m.product_name}</span>
+                {m.product_id && (
+                  <>
+                    <MatchMenuButton
+                      productId={m.product_id}
+                      productName={m.product_name}
+                    />
+                    <DeactivateMenuButton
+                      productId={m.product_id}
+                      productName={m.product_name}
+                    />
+                  </>
+                )}
                 <span className="text-[11px] text-gray-400 shrink-0 tabular-nums w-10 text-right">
-                  {m.quantity}잔
+                  {m.quantity}{unitFor(m.category)}
                 </span>
                 <span className="text-[11px] text-gray-400 shrink-0 tabular-nums w-14 text-right">
                   {m.amount >= 10000
                     ? `${Math.round(m.amount / 10000)}만`
                     : `${m.amount.toLocaleString()}`}
                 </span>
-                <span className="text-[11px] shrink-0 w-14 text-right">
-                  {daysAgo === null ? (
+                <span className="text-[11px] shrink-0 w-20 text-right tabular-nums">
+                  {m.lastSoldDate === null ? (
                     <span className="text-gray-300">—</span>
-                  ) : daysAgo === 0 ? (
-                    <span className="text-gray-400">오늘</span>
-                  ) : daysAgo > 60 ? (
-                    <span className="text-red-400">{daysAgo}일 전</span>
                   ) : (
-                    <span className="text-gray-400">{daysAgo}일 전</span>
+                    <span
+                      className={
+                        daysAgo !== null && daysAgo > 60
+                          ? 'text-red-400'
+                          : 'text-gray-400'
+                      }
+                      title={daysAgo !== null ? `${daysAgo}일 전` : undefined}
+                    >
+                      {m.lastSoldDate.slice(5).replace('-', '/')}
+                    </span>
                   )}
                 </span>
               </li>
             )
           })}
         </ul>
+        </>
       )}
 
-      <p className="text-[11px] text-gray-400 mt-3">
-        ※ 월 10잔 미만 판매 기준. 메뉴판 정리 / 재료 발주 검토에 활용.
+      <p className="text-[11px] text-gray-400 mt-3 [word-break:keep-all]">
+        ※ <strong>마지막 판매 오래된 순 하위 30개</strong>. 한 번도 안 팔린 메뉴 우선. 매출·판매량은 위쪽 selector 기간 기준.
       </p>
     </div>
   )

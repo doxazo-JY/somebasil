@@ -10,7 +10,7 @@ export const RANGE_LABELS: Record<HeatmapRange, string> = {
   all: '전체 (12개월)',
 }
 
-const RANGE_ORDER: HeatmapRange[] = ['4w', '8w', '12w', 'month', 'all']
+const RANGE_ORDER: HeatmapRange[] = ['all', '4w', '8w', '12w', 'month']
 
 interface Props {
   current: HeatmapRange

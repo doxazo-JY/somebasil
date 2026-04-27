@@ -1,4 +1,5 @@
 import { createServerClient } from '../server'
+import { fetchAllRows } from '../fetchAll'
 
 // 월별 지출 카테고리별 합계 (excluded 제외)
 export async function getMonthlyExpensesByCategory(year: number, month: number) {
@@ -56,6 +57,59 @@ export async function getYearlyExpenseTrend(year: number) {
       card: byMonth[m]?.card ?? 0,
     }
   }).filter((d) => Object.values(d).some((v, i) => i > 0 && v > 0)) // 데이터 있는 월만
+}
+
+// 거래처별 재료비 누적 (이번 달 + YTD)
+// monthly_expenses.item(=memo)에서 알려진 공급처 이름으로 매칭
+// (DB에 counterpart 컬럼 없어서 memo 기반 — 새 공급처는 SUPPLIERS 추가 필요)
+export const SUPPLIERS = [
+  { name: '홍인호', label: '홍인호 (원두)' },
+  { name: '김인성', label: '김인성 (말차)' },
+  { name: '한성욱', label: '한성욱 (우유)' },
+  { name: '소금집', label: '주식회사 소금집 (햄)' },
+] as const
+
+export interface SupplierRow {
+  label: string
+  monthly: number
+  ytd: number
+}
+
+export async function getSupplierTotals(year: number, month: number): Promise<SupplierRow[]> {
+  const supabase = createServerClient()
+  const rows = await fetchAllRows<{
+    year: number
+    month: number
+    item: string
+    counterpart: string | null
+    amount: number
+  }>((from, to) =>
+    supabase
+      .from('monthly_expenses')
+      .select('year, month, item, counterpart, amount')
+      .eq('year', year)
+      .in('category', ['ingredients_cash', 'ingredients_card'])
+      .range(from, to),
+  )
+
+  const byLabel = new Map<string, { monthly: number; ytd: number }>()
+  for (const r of rows) {
+    // counterpart 우선 매칭 (정확). 누락 시 item(memo) fallback (재업로드 전 legacy).
+    const cp = r.counterpart ?? ''
+    const item = r.item ?? ''
+    const supplier = SUPPLIERS.find(
+      (s) => cp.includes(s.name) || item.includes(s.name),
+    )
+    if (!supplier) continue
+    const curr = byLabel.get(supplier.label) ?? { monthly: 0, ytd: 0 }
+    curr.ytd += r.amount
+    if (r.month === month) curr.monthly += r.amount
+    byLabel.set(supplier.label, curr)
+  }
+
+  return [...byLabel.entries()]
+    .map(([label, v]) => ({ label, ...v }))
+    .sort((a, b) => b.ytd - a.ytd)
 }
 
 // 월별 인건비 항목 목록 (monthly_expenses.labor) — 실제 지출 기준

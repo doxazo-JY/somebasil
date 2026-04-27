@@ -2,13 +2,9 @@ import PageTabs from '@/components/ui/PageTabs'
 import YearFilter from '@/components/ui/YearFilter'
 import ProfitStatCards from '@/components/profit/ProfitStatCards'
 import ProfitTrendChart from '@/components/profit/ProfitTrendChart'
-import AOVTrendChart from '@/components/profit/AOVTrendChart'
 import MonthlyBreakdownTable from '@/components/profit/MonthlyBreakdownTable'
 import BreakEvenSection from '@/components/profit/BreakEvenSection'
-import DeficitBreakdown from '@/components/profit/DeficitBreakdown'
-import { getYearlySummary } from '@/lib/supabase/queries/dashboard'
-import { getYearlyExpenseTrend } from '@/lib/supabase/queries/expenses'
-import { getYearlyAOVTrend } from '@/lib/supabase/queries/income'
+import { getYearlySummary, getMemosForYear } from '@/lib/supabase/queries/dashboard'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,10 +22,9 @@ export default async function ProfitPage({ searchParams }: PageProps) {
   const now = new Date()
   const year = Number(params.year ?? now.getFullYear())
 
-  const [yearlySummary, yearlyExpenses, aovTrend] = await Promise.all([
+  const [yearlySummary, memos] = await Promise.all([
     getYearlySummary(year),
-    getYearlyExpenseTrend(year),
-    getYearlyAOVTrend(year),
+    getMemosForYear(year),
   ])
 
   // YTD 누적
@@ -47,22 +42,9 @@ export default async function ProfitPage({ searchParams }: PageProps) {
   const avgExpense = monthsWithData > 0 ? ytdExpense / monthsWithData : 0
   const avgProfit = monthsWithData > 0 ? ytdProfit / monthsWithData : 0
 
-  // YTD 카테고리별 지출 집계
-  const ytdCategories = yearlyExpenses.reduce(
-    (acc, m) => ({
-      labor: acc.labor + (m.labor ?? 0),
-      ingredients_cash: acc.ingredients_cash + (m.ingredients_cash ?? 0),
-      ingredients_card: acc.ingredients_card + (m.ingredients_card ?? 0),
-      fixed: acc.fixed + (m.fixed ?? 0),
-      equipment: acc.equipment + (m.equipment ?? 0),
-      card: acc.card + (m.card ?? 0),
-    }),
-    { labor: 0, ingredients_cash: 0, ingredients_card: 0, fixed: 0, equipment: 0, card: 0 },
-  )
-
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
-      <PageTabs group="overview" />
+      <PageTabs group="settlement" />
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
@@ -114,25 +96,10 @@ export default async function ProfitPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      {/* 수입·지출·이익 추이 + 월별 손익 테이블 (같은 데이터의 차트/표) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 items-start">
-        <ProfitTrendChart data={yearlySummary} />
-        <MonthlyBreakdownTable data={yearlySummary} year={year} />
-      </div>
-
-      {/* 객단가 추이 + YTD 비용 구조 분해 (2열) */}
+      {/* 수입·지출·이익 추이 + 월별 손익 테이블 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <AOVTrendChart data={aovTrend} />
-        <DeficitBreakdown
-          income={ytdIncome}
-          labor={ytdCategories.labor}
-          ingredients_cash={ytdCategories.ingredients_cash}
-          ingredients_card={ytdCategories.ingredients_card}
-          fixed={ytdCategories.fixed}
-          equipment={ytdCategories.equipment}
-          card={ytdCategories.card}
-          periodLabel="YTD"
-        />
+        <ProfitTrendChart data={yearlySummary} />
+        <MonthlyBreakdownTable data={yearlySummary} year={year} memos={memos} />
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import { createServerClient } from '../server'
 import { fetchAllRows } from '../fetchAll'
+import { normalizeProductName } from '@/lib/menu-utils'
 
 type SalesRow = { date: string; amount: number; source: string }
 type ExpenseRow = { date: string; amount: number }
@@ -140,21 +141,23 @@ export async function getWeekDetail(
     })
   }
 
-  // 상품별 집계
+  // 상품별 집계 — 핫/아이스 정규화 후 합산
   const productMap = new Map<string, { category: string; quantity: number; amount: number }>()
   for (const r of salesRows) {
     if (!r.product_name) continue
-    const curr = productMap.get(r.product_name) ?? {
+    const display = normalizeProductName(r.product_name, r.category)
+    const key = `${r.category}|${display}`
+    const curr = productMap.get(key) ?? {
       category: r.category,
       quantity: 0,
       amount: 0,
     }
     curr.quantity += r.quantity ?? 0
     curr.amount += r.amount
-    productMap.set(r.product_name, curr)
+    productMap.set(key, curr)
   }
   const topProducts = [...productMap.entries()]
-    .map(([product_name, v]) => ({ product_name, ...v }))
+    .map(([key, v]) => ({ product_name: key.split('|').slice(1).join('|'), ...v }))
     .sort((a, b) => b.amount - a.amount)
 
   // 카테고리별 매출 집계

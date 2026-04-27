@@ -1,21 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 // 그룹 → 기본 랜딩 경로 + 포함 경로
+// 운영: 매일/매주 본다. 결산: 월말 본다. 관리: 데이터·인력 운영.
 const NAV_ITEMS = [
-  { label: '현황', href: '/', group: ['/', '/weekly', '/profit'] },
-  { label: '분석', href: '/income', group: ['/income', '/expenses', '/menu-analysis'] },
-  { label: '관리', href: '/upload', group: ['/upload', '/settings'] },
+  { label: '운영', href: '/', group: ['/', '/weekly'] },
+  { label: '결산', href: '/profit', group: ['/profit', '/expenses', '/menu'] },
+  { label: '관리', href: '/upload', group: ['/upload', '/staff', '/settings'] },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   function isActive(group: string[]) {
     return group.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)))
   }
+
+  // 그룹 이동 시 기간 필터 유지 (?year=&month= 등)
+  // 페이지가 사용하지 않는 쿼리는 무시되므로 무해
+  const qs = searchParams.toString()
+  const withQs = (href: string) => (qs ? `${href}?${qs}` : href)
 
   return (
     <>
@@ -28,7 +35,7 @@ export default function Sidebar() {
           {NAV_ITEMS.map(({ label, href, group }) => (
             <Link
               key={href}
-              href={href}
+              href={withQs(href)}
               className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive(group)
                   ? 'bg-[#1a5c3a] text-white'
@@ -56,7 +63,7 @@ export default function Sidebar() {
           return (
             <Link
               key={href}
-              href={href}
+              href={withQs(href)}
               className={`flex-1 min-w-[60px] flex flex-col items-center justify-center py-2 text-[11px] font-medium transition-colors ${
                 active ? 'text-[#1a5c3a]' : 'text-gray-400'
               }`}

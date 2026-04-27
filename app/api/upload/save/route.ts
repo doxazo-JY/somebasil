@@ -3,11 +3,12 @@ import { createServerClient } from '@/lib/supabase/server'
 import { recalcMonthlySummary } from '@/lib/supabase/recalc'
 import type { DailySalesRow } from '../daily-sales/route'
 import type { BankRow } from '../bank/route'
+import type { MenuRow } from '../menu/route'
 
 export async function POST(req: NextRequest) {
   const { type, rows, filename } = await req.json() as {
-    type: 'daily_sales' | 'bank_transaction'
-    rows: (DailySalesRow | BankRow)[]
+    type: 'daily_sales' | 'bank_transaction' | 'menu'
+    rows: (DailySalesRow | BankRow | MenuRow)[]
     filename: string
   }
 
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
         balance_after: row.balance_after,
         category: row.category,
         item: row.memo,
+        counterpart: row.counterpart, // 거래처별 누적 매칭용 (memo 변동성 대응)
         amount: row.expense ?? 0,
       }
     })
@@ -84,6 +86,23 @@ export async function POST(req: NextRequest) {
     for (const key of monthsAffected) {
       const [year, month] = key.split('-').map(Number)
       await recalcMonthlySummary(supabase, year, month)
+    }
+  }
+
+  if (type === 'menu') {
+    const menuRows = rows as MenuRow[]
+    const inserts = menuRows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      price: r.price,
+      is_active: r.is_active,
+      updated_at: new Date().toISOString(),
+    }))
+    const CHUNK = 500
+    for (let i = 0; i < inserts.length; i += CHUNK) {
+      const chunk = inserts.slice(i, i + CHUNK)
+      const { error } = await supabase.from('products').upsert(chunk, { onConflict: 'id' })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
   }
 
