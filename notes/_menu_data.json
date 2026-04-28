@@ -1,0 +1,520 @@
+{
+  "products": [
+    {
+      "id": "C00154",
+      "name": "TWG  레이디그레이티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00156",
+      "name": "TWG  캐모마일티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00155",
+      "name": "TWG  페퍼민트티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00141",
+      "name": "교토 말차세트",
+      "price": 13000,
+      "is_active": true
+    },
+    {
+      "id": "C00191",
+      "name": "구움과자세트",
+      "price": 10000,
+      "is_active": true
+    },
+    {
+      "id": "C00119",
+      "name": "더치라떼(ICE)",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00035",
+      "name": "더치커피 원액260ml",
+      "price": 10000,
+      "is_active": true
+    },
+    {
+      "id": "C00034",
+      "name": "더치커피 원액450ml",
+      "price": 18000,
+      "is_active": true
+    },
+    {
+      "id": "C00117",
+      "name": "더치커피(ICE)",
+      "price": 5000,
+      "is_active": true
+    },
+    {
+      "id": "C00146",
+      "name": "도원결의 에이드",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00150",
+      "name": "도원결의티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00112",
+      "name": "드립백 A",
+      "price": 7500,
+      "is_active": true
+    },
+    {
+      "id": "C00113",
+      "name": "드립백 B",
+      "price": 14000,
+      "is_active": true
+    },
+    {
+      "id": "C00114",
+      "name": "드립백 C",
+      "price": 27000,
+      "is_active": true
+    },
+    {
+      "id": "C00160",
+      "name": "딸기라떼",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00163",
+      "name": "라우치병 주스(딸기)",
+      "price": 3000,
+      "is_active": true
+    },
+    {
+      "id": "C00164",
+      "name": "라우치병 주스(망고)",
+      "price": 3000,
+      "is_active": true
+    },
+    {
+      "id": "C00162",
+      "name": "라우치병 주스(오렌지)",
+      "price": 3000,
+      "is_active": true
+    },
+    {
+      "id": "C00171",
+      "name": "레몬 마들렌",
+      "price": 1500,
+      "is_active": true
+    },
+    {
+      "id": "C00110",
+      "name": "레몬에이드",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00147",
+      "name": "레몬티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00153",
+      "name": "로얄 밀크티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00132",
+      "name": "리얼바닐라빈 라떼",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00161",
+      "name": "리얼바닐라빈 밀크",
+      "price": 3500,
+      "is_active": true
+    },
+    {
+      "id": "C00140",
+      "name": "말차 딸기 크림(Only Ice)",
+      "price": 7000,
+      "is_active": true
+    },
+    {
+      "id": "C00138",
+      "name": "말차 라떼",
+      "price": 7000,
+      "is_active": true
+    },
+    {
+      "id": "C00139",
+      "name": "말차 크림",
+      "price": 7000,
+      "is_active": true
+    },
+    {
+      "id": "C00168",
+      "name": "말차 티라미수",
+      "price": 7000,
+      "is_active": true
+    },
+    {
+      "id": "C00095",
+      "name": "말차 티라미수(미니)",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00198",
+      "name": "망고아이스티",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00172",
+      "name": "미니 마들렌 박스",
+      "price": 3500,
+      "is_active": true
+    },
+    {
+      "id": "C00134",
+      "name": "바닐라 슈페너",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00167",
+      "name": "바스크 치즈케익",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00178",
+      "name": "베이글샌드위치1종+아메리카노 세트",
+      "price": 10000,
+      "is_active": true
+    },
+    {
+      "id": "C00158",
+      "name": "복숭아아이스티",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00206",
+      "name": "봄딸기주스",
+      "price": 5000,
+      "is_active": true
+    },
+    {
+      "id": "C00137",
+      "name": "순수 말차",
+      "price": 7000,
+      "is_active": true
+    },
+    {
+      "id": "C00142",
+      "name": "순수 말차세트",
+      "price": 10000,
+      "is_active": true
+    },
+    {
+      "id": "C00127",
+      "name": "아메리카노",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00031",
+      "name": "아이스초코",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00107",
+      "name": "아이스티",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00135",
+      "name": "아인슈페너",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00151",
+      "name": "애플시나몬티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00126",
+      "name": "에스프레소",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00152",
+      "name": "오미자티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00207",
+      "name": "이벤트용 봄딸기주스",
+      "price": 2500,
+      "is_active": true
+    },
+    {
+      "id": "C00047",
+      "name": "자몽에이드",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00148",
+      "name": "자몽티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00175",
+      "name": "잠봉뵈르&고메버터베이글샌드위치",
+      "price": 8000,
+      "is_active": true
+    },
+    {
+      "id": "C00176",
+      "name": "잠봉뵈르&루꼴라베이글샌드위치",
+      "price": 8000,
+      "is_active": true
+    },
+    {
+      "id": "C00082",
+      "name": "초코 쿠키 박스",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00133",
+      "name": "카라멜마끼아또",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00128",
+      "name": "카페라떼",
+      "price": 4500,
+      "is_active": true
+    },
+    {
+      "id": "C00189",
+      "name": "카페모카",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00129",
+      "name": "카푸치노",
+      "price": 4500,
+      "is_active": true
+    },
+    {
+      "id": "C00165",
+      "name": "크로와상 붕어빵",
+      "price": 3000,
+      "is_active": true
+    },
+    {
+      "id": "C00157",
+      "name": "팔레데떼 프랑스티 블루오브런던",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00145",
+      "name": "패션후르츠 에이드",
+      "price": 6000,
+      "is_active": true
+    },
+    {
+      "id": "C00149",
+      "name": "패션후르츠티",
+      "price": 5500,
+      "is_active": true
+    },
+    {
+      "id": "C00174",
+      "name": "플레인 베이글(+크림치즈)",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00177",
+      "name": "플레인베이글+아메리카노 세트",
+      "price": 7000,
+      "is_active": true
+    },
+    {
+      "id": "C00083",
+      "name": "플레인스콘",
+      "price": 3500,
+      "is_active": true
+    },
+    {
+      "id": "C00159",
+      "name": "핫/아이스초코",
+      "price": 4000,
+      "is_active": true
+    },
+    {
+      "id": "C00185",
+      "name": "핸드드립",
+      "price": 8000,
+      "is_active": true
+    },
+    {
+      "id": "C00170",
+      "name": "호두파이",
+      "price": 3500,
+      "is_active": true
+    },
+    {
+      "id": "C00136",
+      "name": "흑임자슈페너",
+      "price": 6000,
+      "is_active": true
+    }
+  ],
+  "category_by_name": {
+    "자몽티(HOT)": "tea",
+    "아이스티": "tea",
+    "말차 라떼(ICE)": "matcha",
+    "에스프레소": "coffee",
+    "아메리카노(ICE)": "coffee",
+    "카페라떼(HOT)": "coffee",
+    "리얼바닐라빈라떼(HOT)": "coffee",
+    "아메리카노(HOT)": "coffee",
+    "패션후르츠티(HOT)": "tea",
+    "자몽에이드": "ade",
+    "레몬 마들렌": "dessert",
+    "팥 크로와상 붕어빵": "dessert",
+    "초코 쿠키 박스": "dessert",
+    "바닐라슈페너(ICE)": "coffee",
+    "아인슈페너(HOT)": "coffee",
+    "미니 마들렌 박스": "dessert",
+    "아이스초코": "beverage",
+    "핫초코": "beverage",
+    "말차 티라미수": "dessert",
+    "말차 티라미수(미니)": "dessert",
+    "플레인스콘": "dessert",
+    "호두파이": "dessert",
+    "핸드드립(HOT)": "drip_coffee",
+    "바스크 치즈케익": "dessert",
+    "레몬티(HOT)": "tea",
+    "사이즈업": "etc",
+    "딸기라떼": "beverage",
+    "카라멜마끼아또(ICE)": "coffee",
+    "말차 라떼(HOT)": "matcha",
+    "도원결의 에이드": "ade",
+    "카페라떼(ICE)": "coffee",
+    "패션후르츠 에이드": "ade",
+    "샷추가": "etc",
+    "핸드드립(ICE)": "drip_coffee",
+    "리얼 바닐라빈 밀크(ICE)": "beverage",
+    "잠봉뵈르&루꼴라 베이글 샌드위치": "dessert",
+    "카페모카(HOT)": "coffee",
+    "레몬에이드": "ade",
+    "레몬티(ICE)": "tea",
+    "오미자티": "tea",
+    "더치라떼(ICE)": "coffee",
+    "플레인 베이글(+크림치즈)": "dessert",
+    "순수 말차 세트(HOT)": "matcha",
+    "플레인 베이글+아메리카노 세트": "dessert",
+    "라우치 병 주스(오렌지)": "beverage",
+    "애플시나몬티": "tea",
+    "말차 딸기 크림(Only Ice)": "matcha",
+    "도원결의티": "tea",
+    "크로와상 붕어빵": "dessert",
+    "말차 크림": "matcha",
+    "아메리카노": "coffee",
+    "디카페인 변경": "etc",
+    "리얼 바닐라빈 밀크(HOT)": "beverage",
+    "흑임자슈페너(HOT)": "coffee",
+    "더치커피(ICE)": "coffee",
+    "카페모카(ICE)": "coffee",
+    "베이글샌드위치1종+아메리카노 세트": "dessert",
+    "말차 라떼": "matcha",
+    "망고아이스티": "tea",
+    "말차 크림(ICE)": "matcha",
+    "카페모카": "coffee",
+    "TWG 캐모마일(HOT)": "tea",
+    "카라멜마끼아또(HOT)": "coffee",
+    "레몬티": "tea",
+    "봄딸기주스": "season",
+    "플레인 스콘": "dessert",
+    "복숭아아이스티": "tea",
+    "리얼바닐라빈라떼(ICE)": "coffee",
+    "아인슈페너(ICE)": "coffee",
+    "로얄 밀크티": "tea",
+    "이벤트용 봄딸기주스": "season",
+    "도원결의(HOT)": "tea",
+    "교토 말차 세트(ICE)": "matcha",
+    "순수 말차(HOT)": "matcha",
+    "카푸치노(HOT)": "coffee",
+    "바닐라슈페너(HOT)": "coffee",
+    "구움과자세트": "dessert",
+    "드립백 C": "coffee",
+    "더치커피 원액450ml": "dutch_coffee",
+    "더치커피 원액260ml": "dutch_coffee",
+    "라우치 병 주스(망고)": "beverage",
+    "텀블러 할인": "etc",
+    "핫/아이스초코": "beverage",
+    "흑임자슈페너(ICE)": "coffee",
+    "TWG 페퍼민트티(ICE)": "tea",
+    "자몽티(ICE)": "tea",
+    "애플시나몬티(ICE)": "tea",
+    "애플시나몬티(HOT)": "tea",
+    "TWG 레이디 그레이(ICE)": "tea",
+    "패션후르츠티(ICE)": "tea",
+    "TWG 레이디 그레이(HOT)": "tea",
+    "카페라떼": "coffee",
+    "TWG  캐모마일티": "tea",
+    "순수 말차": "matcha",
+    "라우치 병 주스(딸기)": "beverage",
+    "로얄 밀크티(ICE)": "tea",
+    "교토 말차 세트(HOT)": "matcha",
+    "팔레데떼 프랑스티 블루오브런던": "tea",
+    "리얼바닐라빈 라떼": "coffee",
+    "바닐라 슈페너": "coffee",
+    "순수 말차(ICE)": "matcha",
+    "초콜릿크림(HOT)": "beverage",
+    "말차 크림(HOT)": "matcha",
+    "쿠키박스(견과류)": "dessert",
+    "도원결의(ICE)": "tea",
+    "오미자티(HOT)": "tea"
+  },
+  "category_counts": {
+    "tea": 26,
+    "matcha": 13,
+    "coffee": 26,
+    "ade": 4,
+    "dessert": 17,
+    "beverage": 10,
+    "drip_coffee": 2,
+    "etc": 4,
+    "season": 2,
+    "dutch_coffee": 2
+  }
+}
