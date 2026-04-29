@@ -1,7 +1,5 @@
 'use client'
 
-import { useRef } from 'react'
-
 interface FileDropZoneProps {
   accept: string
   hint: string
@@ -9,11 +7,25 @@ interface FileDropZoneProps {
   loading?: boolean
 }
 
+// 확장자만 들어온 accept에 표준 MIME 타입을 자동 보강
+// (안드로이드 파일관리자는 MIME 기반 필터라 .xlsx만 주면 회색 처리됨)
+function augmentAccept(accept: string): string {
+  const tokens = accept.split(',').map((s) => s.trim()).filter(Boolean)
+  const hasXlsx = tokens.includes('.xlsx')
+  const hasXls = tokens.includes('.xls')
+  const xlsxMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  const xlsMime = 'application/vnd.ms-excel'
+  if (hasXlsx && !tokens.includes(xlsxMime)) tokens.push(xlsxMime)
+  if (hasXls && !tokens.includes(xlsMime)) tokens.push(xlsMime)
+  return tokens.join(',')
+}
+
 export default function FileDropZone({ accept, hint, onFile, loading }: FileDropZoneProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const acceptWithMime = augmentAccept(accept)
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
+    if (loading) return
     const file = e.dataTransfer.files[0]
     if (file) onFile(file)
   }
@@ -21,16 +33,27 @@ export default function FileDropZone({ accept, hint, onFile, loading }: FileDrop
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) onFile(file)
+    // 같은 파일 재선택 가능하도록 초기화
+    e.target.value = ''
   }
 
   return (
-    <div
+    <label
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
-      onClick={() => inputRef.current?.click()}
-      className="border-2 border-dashed border-gray-200 rounded-xl px-8 py-12 flex flex-col items-center gap-3 cursor-pointer hover:border-[#1a5c3a] hover:bg-green-50/30 transition-colors"
+      className={`border-2 border-dashed border-gray-200 rounded-xl px-8 py-12 flex flex-col items-center gap-3 transition-colors ${
+        loading
+          ? 'cursor-not-allowed opacity-60'
+          : 'cursor-pointer hover:border-[#1a5c3a] hover:bg-green-50/30'
+      }`}
     >
-      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={handleChange} />
+      <input
+        type="file"
+        accept={acceptWithMime}
+        className="hidden"
+        onChange={handleChange}
+        disabled={loading}
+      />
       <span className="text-3xl">📄</span>
       {loading ? (
         <p className="text-sm text-gray-500">파싱 중...</p>
@@ -42,6 +65,6 @@ export default function FileDropZone({ accept, hint, onFile, loading }: FileDrop
           <p className="text-xs text-gray-400 text-center [word-break:keep-all]">{hint}</p>
         </>
       )}
-    </div>
+    </label>
   )
 }
