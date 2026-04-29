@@ -16,6 +16,7 @@ const GROUPS: Record<GroupKey, { label: string; href: string }[]> = {
     { label: '손익', href: '/profit' },
     { label: '지출', href: '/expenses' },
     { label: '메뉴', href: '/menu' },
+    { label: '원가', href: '/recipes' },
   ],
   // 데이터·인력 관리
   admin: [

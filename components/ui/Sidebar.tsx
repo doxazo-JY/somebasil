@@ -7,7 +7,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 // 운영: 매일/매주 본다. 결산: 월말 본다. 관리: 데이터·인력 운영.
 const NAV_ITEMS = [
   { label: '운영', href: '/', group: ['/', '/weekly'] },
-  { label: '결산', href: '/profit', group: ['/profit', '/expenses', '/menu'] },
+  { label: '결산', href: '/profit', group: ['/profit', '/expenses', '/menu', '/recipes'] },
   { label: '관리', href: '/upload', group: ['/upload', '/staff', '/settings'] },
 ]
 

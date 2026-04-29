@@ -9,12 +9,22 @@ import type { BankRow } from '@/app/api/upload/bank/route'
 import type { DailySalesRow } from '@/app/api/upload/daily-sales/route'
 import type { MenuRow } from '@/app/api/upload/menu/route'
 
-type Tab = 'daily' | 'bank' | 'menu'
+type Tab = 'daily' | 'bank' | 'menu' | 'recipe'
 
 type DailyPreview = { type: 'daily'; rows: DailySalesRow[] }
 type BankPreview = { type: 'bank'; rows: PreviewRow[]; originals: BankRow[] }
 type MenuPreview = { type: 'menu'; rows: MenuRow[] }
 type PreviewState = DailyPreview | BankPreview | MenuPreview
+
+interface RecipeUploadStats {
+  ingredientCount: number
+  pricedCount: number
+  subRecipeCount: number
+  subRecipeItemCount: number
+  recipeMenuCount: number
+  recipeItemCount: number
+  packagingSetCount: number
+}
 
 function bankRowToPreview(row: BankRow): PreviewRow {
   return {
@@ -39,16 +49,33 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState<PreviewState | null>(null)
+  const [recipeStats, setRecipeStats] = useState<RecipeUploadStats | null>(null)
   const [filename, setFilename] = useState('')
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
   async function handleFile(file: File) {
     setLoading(true)
     setPreview(null)
+    setRecipeStats(null)
     setMessage(null)
 
     const formData = new FormData()
     formData.append('file', file)
+
+    // 레시피 탭: 파싱 + 저장이 한 번에 (파일 크고 시트 4개라 미리보기 생략)
+    if (tab === 'recipe') {
+      const res = await fetch('/api/upload/recipe', { method: 'POST', body: formData })
+      const json = await res.json()
+      setLoading(false)
+      if (!res.ok) {
+        setMessage({ text: json.error ?? '업로드 실패', ok: false })
+        return
+      }
+      setRecipeStats(json.stats as RecipeUploadStats)
+      setMessage({ text: '저장 완료! 메뉴 원가 페이지에서 확인하세요.', ok: true })
+      router.refresh()
+      return
+    }
 
     const endpointMap = {
       daily: '/api/upload/daily-sales',
@@ -76,7 +103,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
         rows: originals.map(bankRowToPreview),
         originals,
       })
-    } else {
+    } else if (tab === 'menu') {
       setPreview({ type: 'menu', rows: json.rows as MenuRow[] })
     }
   }
@@ -159,20 +186,23 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 탭 — 모바일은 짧은 라벨 (일별/통장/메뉴), 데스크탑은 풀 라벨 */}
+      {/* 탭 — 모바일은 짧은 라벨, 데스크탑은 풀 라벨 */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit max-w-full">
-        {(['daily', 'bank', 'menu'] as Tab[]).map((t) => {
-          const short = t === 'daily' ? '일별' : t === 'bank' ? '통장' : '메뉴'
+        {(['daily', 'bank', 'menu', 'recipe'] as Tab[]).map((t) => {
+          const short =
+            t === 'daily' ? '일별' : t === 'bank' ? '통장' : t === 'menu' ? '메뉴' : '레시피'
           const full =
             t === 'daily'
               ? '📋 일별 매출'
               : t === 'bank'
                 ? '🏦 통장 거래내역'
-                : '🍽️ 메뉴 마스터'
+                : t === 'menu'
+                  ? '🍽️ 메뉴 마스터'
+                  : '🥄 레시피·원가'
           return (
             <button
               key={t}
-              onClick={() => { setTab(t); setPreview(null); setMessage(null) }}
+              onClick={() => { setTab(t); setPreview(null); setRecipeStats(null); setMessage(null) }}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                 tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -192,7 +222,9 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
             ? 'POS 일일매출 엑셀 파일 (기간·단일 모두 가능)'
             : tab === 'bank'
               ? '하나은행 거래내역 엑셀 파일'
-              : 'POS 메뉴 마스터 엑셀 (5컬럼: ID·Y/N·명칭·단가)'
+              : tab === 'menu'
+                ? 'POS 메뉴 마스터 엑셀 (5컬럼: ID·Y/N·명칭·단가)'
+                : '레시피 템플릿 엑셀 v5 (4시트: 재료·서브레시피·레시피·포장세트). 부분 입력 OK'
         }
         onFile={handleFile}
         loading={loading}
@@ -228,10 +260,38 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
         />
       )}
 
+      {recipeStats && <RecipeUploadResult stats={recipeStats} />}
+
       {/* 통장 탭 전용 추가 컨텐츠 (재분류 테이블 등) */}
       {tab === 'bank' && bankExtras && <div className="mt-4">{bankExtras}</div>}
       {/* 메뉴 탭 전용 추가 컨텐츠 (마스터 관리 등) */}
       {tab === 'menu' && menuExtras && <div className="mt-4">{menuExtras}</div>}
+    </div>
+  )
+}
+
+// 레시피 업로드 결과 — 시트별 카운트
+function RecipeUploadResult({ stats }: { stats: RecipeUploadStats }) {
+  const items = [
+    { label: '재료', value: `${stats.ingredientCount}개 (단가 ${stats.pricedCount})` },
+    { label: '서브레시피', value: `${stats.subRecipeCount}종 / 구성 ${stats.subRecipeItemCount}` },
+    { label: '메뉴 레시피', value: `${stats.recipeMenuCount}메뉴 / 라인 ${stats.recipeItemCount}` },
+    { label: '포장세트', value: `${stats.packagingSetCount}세트` },
+  ]
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-5">
+      <p className="text-sm font-semibold text-gray-700 mb-3">반영 결과</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {items.map((it) => (
+          <div key={it.label} className="bg-gray-50 rounded-lg px-3 py-2">
+            <p className="text-[10px] text-gray-400 mb-0.5">{it.label}</p>
+            <p className="text-sm text-gray-800 font-semibold">{it.value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-gray-400 mt-4 [word-break:keep-all]">
+        부분 입력 시 단가/레시피 누락은 ‘원가 미등록’ 으로 표시됩니다. 추후 같은 양식 재업로드로 갱신 가능.
+      </p>
     </div>
   )
 }

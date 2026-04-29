@@ -140,20 +140,56 @@
   - "전기세", "세금", "지방세" 등 → 고정비
   - 나머지 출금 → 카드대금 (기본값)
 
-## 현재 작업 단계 (4/27 기준)
+## 점장용 가이드 파일
+점장에게 안내할 때 또는 점장 PC의 Claude Code가 점장 질문에 답할 때 참고:
+- `docs/점장-가이드.md` — 시스템 일반 사용 가이드
+- `docs/레시피-입력-가이드.md` — 레시피·원가 엑셀 입력 가이드 (시트별 채우는 법, 메시지별 해결 방법, Claude Code 프롬프트 예시)
+
+## 메뉴 원가 데이터 모델 (4/29 도입)
+
+### ingredients — 재료 마스터
+- id, name (UNIQUE), unit, kind ('purchased' | 'made'), payment_method ('cash' | 'card'), is_active
+
+### ingredient_prices — 단가 이력
+- ingredient_id, unit_price, effective_date
+- UNIQUE (ingredient_id, effective_date)
+- 조회: `effective_date <= asOfDate, 최신`
+
+### recipes — 메뉴 레시피
+- product_name_normalized (= `stripVariantSuffix(name)` — HOT/ICE 통합 키)
+- ingredient_id, quantity
+- UNIQUE (product_name_normalized, ingredient_id)
+
+### sub_recipes / sub_recipe_items — 수제재료 배합
+- output_ingredient_id (UNIQUE — 한 수제재료당 1배합), output_quantity
+- 1단계 깊이 (수제 안에 수제 X)
+
+### packaging_sets / packaging_set_items — 포장세트
+- (product_category, serve_temp) UNIQUE — 카테고리×온도 매핑
+- serve_temp NULL = 디저트류
+
+### 입력 양식
+- `notes/레시피_템플릿_v5.xlsx` — 점장 입력용 (4시트: 재료/서브레시피/레시피/포장세트)
+- 생성 스크립트: `notes/_make_recipe_template_v5.py`
+- 부분 입력 OK — 누락은 `missing_price` / `no_recipe` 상태로 표시
+
+## 현재 작업 단계 (4/29 기준)
 
 완성된 영역:
 - [x] 대시보드 콕핏 (InsightBanner / KPI 클릭 / DeficitSignals / 매출 달력 / 메모 / 트렌드)
 - [x] 주간 보고 (`/weekly`)
-- [x] 결산 (`/profit`, `/expenses`, `/menu`)
+- [x] 결산 (`/profit`, `/expenses`, `/menu`, `/recipes`)
 - [x] 메뉴 마스터 매칭/청소 시스템 (alias + MasterManager)
-- [x] 업로드 + 재분류 (탭별 분리)
+- [x] 업로드 + 재분류 (탭별 분리, 레시피 탭 추가)
 - [x] 모바일 대응 (콕핏 = 폰 OK, 관리 = PC 전용)
+- [x] 메뉴 원가 파이프라인 (DB 5테이블 + 업로드 파서 + 원가 계산 함수 + `/recipes` 페이지)
 
 외부 데이터 대기:
-- [ ] 메뉴 원가 룰 (점장 레시피)
+- [ ] 메뉴 원가 입력 (점장 v5 엑셀 채워서 업로드)
 - [ ] 직원/인건비 (회계사 데이터, 현재 placeholder)
 
-축적 후 결정:
+다음 작업 후보:
+- [ ] 재료 1세트 회수율 화면 (현금 4종 — 봉지 단위, 카드 — 월 단위)
+- [ ] `CostRatioCards` / `DeficitSignals` 원가율 pending 해제 (대부분 메뉴 원가 등록 후)
 - [ ] 신호등 절대 임계값 (운영 6개월)
 - [ ] InsightBanner 임계값 적정성 점검
