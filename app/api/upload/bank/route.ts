@@ -125,9 +125,34 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = await file.arrayBuffer()
+
   // cellDates: true → Excel 날짜 시리얼을 JS Date로 자동 변환
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+  // 모바일 하나은행 export가 HTML 위장 .xls 인 케이스 대비 — 1차 array, 실패 시 binary로 재시도
+  let workbook: XLSX.WorkBook
+  try {
+    workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+  } catch (err) {
+    try {
+      workbook = XLSX.read(new Uint8Array(buffer), { type: 'binary', cellDates: true })
+    } catch (err2) {
+      const msg = err2 instanceof Error ? err2.message : String(err2)
+      console.error('[bank-upload] XLSX.read 실패', { name: file.name, size: file.size, msg })
+      return NextResponse.json(
+        {
+          error: `엑셀 파일 형식을 읽을 수 없습니다. 하나은행 PC 사이트에서 직접 다운받은 .xlsx 파일인지 확인해주세요. (file: ${file.name}, ${file.size}B, ${msg})`,
+        },
+        { status: 400 },
+      )
+    }
+  }
+
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
+  if (!sheet) {
+    return NextResponse.json(
+      { error: `엑셀에 시트가 없습니다. (sheets: ${workbook.SheetNames.join(',') || '(없음)'})` },
+      { status: 400 },
+    )
+  }
 
   // sheet_to_json으로 전체 읽기 (header: 1 → 배열 형태)
   const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 })
