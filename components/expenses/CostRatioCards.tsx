@@ -5,7 +5,6 @@ interface CostRatioCardsProps {
   labor: number
   ingredients: number
   fixed: number
-  card: number
 }
 
 interface RatioItem {
@@ -30,7 +29,7 @@ function fmt(v: number) {
   return `${Math.round(v / 10000)}만`
 }
 
-export default function CostRatioCards({ income, labor, ingredients, fixed, card }: CostRatioCardsProps) {
+export default function CostRatioCards({ income, labor, ingredients, fixed }: CostRatioCardsProps) {
   if (income === 0) return null
 
   const items: RatioItem[] = [
@@ -43,14 +42,21 @@ export default function CostRatioCards({ income, labor, ingredients, fixed, card
       note: '업종 평균 25~30%',
     },
     {
-      // 통장 발주액 ÷ 매출은 실제 원가율과 무관 (발주 타이밍 영향 큼)
-      // 메뉴별 원가 룰 도입 후 활성화
+      label: '재료비율',
+      amount: ingredients,
+      ratio: (ingredients / income) * 100,
+      warnAt: 35,
+      dangerAt: 45,
+      note: '현금+카드 합산 / 통장 발주액 기준',
+    },
+    {
+      // 메뉴별 원가 룰(/recipes 등록률) 기반. 등록률 80%+ 도달 시 활성
       label: '원가율',
       amount: 0,
       ratio: 0,
       warnAt: 30,
       dangerAt: 40,
-      note: '계산 방식 도입 후 표시',
+      note: '메뉴 원가 등록률 80%+ 후 표시',
       pending: true,
     },
     {
@@ -60,14 +66,6 @@ export default function CostRatioCards({ income, labor, ingredients, fixed, card
       warnAt: 20,
       dangerAt: 30,
       note: '업종 평균 15~20%',
-    },
-    {
-      label: '카드대금',
-      amount: card,
-      ratio: (card / income) * 100,
-      warnAt: 15,
-      dangerAt: 25,
-      note: '기타 지출',
     },
   ]
 

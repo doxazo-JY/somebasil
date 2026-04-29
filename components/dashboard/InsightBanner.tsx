@@ -15,10 +15,10 @@ interface InsightBannerProps {
   prevIncome: number
   laborCurr: number
   laborPrev: number
+  ingredientsCurr: number
+  ingredientsPrev: number
   fixedCurr: number
   fixedPrev: number
-  cardCurr: number
-  cardPrev: number
   /** 어제 매출 (KST) */
   yesterdayIncome?: number
   /** 어제와 같은 요일 1주 전 매출 (전주同曜비 계산용) */
@@ -58,10 +58,10 @@ export default function InsightBanner({
   prevIncome,
   laborCurr,
   laborPrev,
+  ingredientsCurr,
+  ingredientsPrev,
   fixedCurr,
   fixedPrev,
-  cardCurr,
-  cardPrev,
   yesterdayIncome,
   prevWeekSameDayIncome,
 }: InsightBannerProps) {
@@ -70,7 +70,7 @@ export default function InsightBanner({
   const totalDays = daysInMonth(year, month)
   const daysRemaining = isPartial ? totalDays - today.day : 0
 
-  // worst signal — DeficitSignals와 동일 로직 (인건비/고정비/카드대금만, 원가율 pending)
+  // worst signal — DeficitSignals와 동일 로직 (인건비/재료비/고정비, 원가율 pending)
   const safe = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0)
   const signals = [
     {
@@ -82,18 +82,18 @@ export default function InsightBanner({
       href: '/staff',
     },
     {
-      label: '고정비율',
+      label: '재료비율',
       delta:
         prevIncome > 0 && income > 0
-          ? safe(fixedCurr, income) - safe(fixedPrev, prevIncome)
+          ? safe(ingredientsCurr, income) - safe(ingredientsPrev, prevIncome)
           : null,
       href: '/expenses',
     },
     {
-      label: '카드대금율',
+      label: '고정비율',
       delta:
         prevIncome > 0 && income > 0
-          ? safe(cardCurr, income) - safe(cardPrev, prevIncome)
+          ? safe(fixedCurr, income) - safe(fixedPrev, prevIncome)
           : null,
       href: '/expenses',
     },

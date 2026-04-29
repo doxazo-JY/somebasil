@@ -95,6 +95,13 @@ export async function recalcMonthlySummary(
 export async function recalcAllMonths(
   supabase: ReturnType<typeof createServerClient>,
 ): Promise<void> {
+  // 1회성 마이그레이션: legacy 'card' 카테고리 → 'ingredients_card'
+  // (4/30 결정: catch-all 카드대금은 사실상 재료비 카드. idempotent — 잔여 0건이면 no-op)
+  await supabase
+    .from('monthly_expenses')
+    .update({ category: 'ingredients_card' })
+    .eq('category', 'card')
+
   const { data } = await supabase
     .from('monthly_summary')
     .select('year, month')

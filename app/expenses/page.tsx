@@ -47,18 +47,17 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const ingredients = ingredientsCash + ingredientsCard
   const fixed = expensesByCategory.fixed ?? 0
   const equipment = expensesByCategory.equipment ?? 0
-  const card = expensesByCategory.card ?? 0
   // 헤드라인 합계는 monthly_summary.total_expense 사용 (대시보드와 일치).
   // - manual_adjustments(수동 조정) 반영됨
   // - 'excluded' 카테고리 항상 제외됨
   // 카테고리 합산(labor + ingredients + ...)과는 manual_adjustments 만큼 차이 날 수 있음.
-  const categorySum = labor + ingredients + fixed + equipment + card
+  const categorySum = labor + ingredients + fixed + equipment
   const totalExpense = summary?.total_expense ?? categorySum
   const adjustmentDelta = totalExpense - categorySum
 
   // 연간 누적 지출 (설비투자 포함)
   const cumExpense = trend.reduce(
-    (s, d) => s + d.ingredients_cash + d.ingredients_card + d.labor + d.fixed + d.equipment + d.card, 0
+    (s, d) => s + d.ingredients_cash + d.ingredients_card + d.labor + d.fixed + d.equipment, 0
   )
 
   // 첫 줄 요약 — 전월比 변화 액션 인사이트
@@ -69,14 +68,12 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     (prevExpensesByCategory.ingredients_cash ?? 0) +
     (prevExpensesByCategory.ingredients_card ?? 0)
   const prevFixed = prevExpensesByCategory.fixed ?? 0
-  const prevCard = prevExpensesByCategory.card ?? 0
   const prevEquipment = prevExpensesByCategory.equipment ?? 0
 
   const cats = [
     { label: '인건비', amount: labor, prev: prevLabor },
     { label: '재료비', amount: ingredients, prev: prevIngredients },
     { label: '고정비', amount: fixed, prev: prevFixed },
-    { label: '카드대금', amount: card, prev: prevCard },
     { label: '설비투자', amount: equipment, prev: prevEquipment },
   ].filter((c) => c.amount > 0)
 
@@ -153,7 +150,6 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
             labor={labor}
             ingredients={ingredients}
             fixed={fixed}
-            card={card}
           />
         </div>
       ) : (

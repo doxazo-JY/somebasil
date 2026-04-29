@@ -127,10 +127,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           prevIncome={prev?.income ?? 0}
           laborCurr={expenses.labor ?? 0}
           laborPrev={prevExpenses.labor ?? 0}
+          ingredientsCurr={ingredientsCurr}
+          ingredientsPrev={ingredientsPrev}
           fixedCurr={expenses.fixed ?? 0}
           fixedPrev={prevExpenses.fixed ?? 0}
-          cardCurr={expenses.card ?? 0}
-          cardPrev={prevExpenses.card ?? 0}
           yesterdayIncome={yesterdayIncome}
           prevWeekSameDayIncome={prevWeekSameDayIncome}
         />
@@ -208,12 +208,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           laborCurr={expenses.labor ?? 0}
           ingredientsCurr={ingredientsCurr}
           fixedCurr={expenses.fixed ?? 0}
-          cardCurr={expenses.card ?? 0}
           prevIncome={prev?.income ?? 0}
           laborPrev={prevExpenses.labor ?? 0}
           ingredientsPrev={ingredientsPrev}
           fixedPrev={prevExpenses.fixed ?? 0}
-          cardPrev={prevExpenses.card ?? 0}
         />
       </div>
 

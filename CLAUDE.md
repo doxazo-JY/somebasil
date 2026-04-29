@@ -68,7 +68,8 @@
 
 ### monthly_expenses — 월별 지출 항목 명세
 - id, year, month, category, item, amount, created_at
-- category: 'ingredients'(재료비) | 'labor'(인건비) | 'fixed'(고정비) | 'card'(카드대금)
+- category: 'ingredients_cash'(재료비-현금) | 'ingredients_card'(재료비-카드) | 'labor'(인건비) | 'fixed'(고정비) | 'equipment'(설비투자) | 'excluded'(제외)
+- ※ 4/30 'card'(카드대금) 폐기 — catch-all = 사실상 재료비(카드). 기존 데이터는 `recalcAllMonths()`에서 ingredients_card로 1회 마이그레이션 (idempotent)
 
 ### staff — 직원 정보
 - id, name, role, hire_date, leave_date, hourly_pay, is_active, created_at
@@ -116,9 +117,12 @@
 - 파싱 우선순위:
   - 카드사 입금 패턴 → 수입 (income)
   - 급여 패턴 → 인건비 (labor)
-  - 원두/말차/우유/햄 등 재료 키워드 → 재료비 (ingredients)
   - 전기세/지방세/세금 키워드 → 고정비 (fixed)
-  - 나머지 출금 → 카드대금 (card, 기본값)
+  - 박기선 등 제외 수취인 → 제외 (excluded)
+  - 설비 키워드 → 설비투자 (equipment)
+  - 정기 공급처(홍인호/한성욱/김인성/소금집) → 재료비-현금 (ingredients_cash)
+  - 비정기 재료 키워드 → 재료비-카드 (ingredients_card)
+  - 나머지 출금 → 재료비-카드 (ingredients_card, 기본값) ← 4/30 변경. outlier는 ReclassifyTable에서 수동 조정
 
 ## 직원 직책 (현재 미구현, 추후 재설계)
 점장 / 매니저 / 알바생

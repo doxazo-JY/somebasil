@@ -18,7 +18,6 @@ const CATEGORY_LABEL: Record<string, string> = {
   labor: '인건비',
   fixed: '고정비',
   equipment: '설비투자',
-  card: '카드대금',
 }
 
 const COLORS = ['#1a5c3a', '#4ade80', '#86efac', '#60a5fa', '#bbf7d0']

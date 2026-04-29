@@ -9,7 +9,6 @@ const CATEGORY_OPTIONS = [
   { value: 'labor', label: '인건비', color: 'text-violet-600' },
   { value: 'fixed', label: '고정비', color: 'text-blue-600' },
   { value: 'equipment', label: '설비투자', color: 'text-sky-600' },
-  { value: 'card', label: '카드대금', color: 'text-gray-500' },
   { value: 'excluded', label: '제외', color: 'text-gray-400' },
 ]
 

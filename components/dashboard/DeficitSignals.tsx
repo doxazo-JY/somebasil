@@ -9,12 +9,10 @@ interface DeficitSignalsProps {
   laborCurr: number
   ingredientsCurr: number
   fixedCurr: number
-  cardCurr: number
   prevIncome: number
   laborPrev: number
   ingredientsPrev: number
   fixedPrev: number
-  cardPrev: number
 }
 
 interface SignalRow {
@@ -38,12 +36,10 @@ export default function DeficitSignals({
   laborCurr,
   ingredientsCurr,
   fixedCurr,
-  cardCurr,
   prevIncome,
   laborPrev,
   ingredientsPrev,
   fixedPrev,
-  cardPrev,
 }: DeficitSignalsProps) {
   const safe = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0)
 
@@ -59,8 +55,17 @@ export default function DeficitSignals({
       href: '/staff',
     },
     {
-      // 통장 발주액 ÷ 매출은 실제 원가율과 무관 (발주 타이밍 영향)
-      // 메뉴별 원가 룰 도입 후 활성화
+      label: '재료비율',
+      amount: ingredientsCurr,
+      ratio: safe(ingredientsCurr, income),
+      delta:
+        prevIncome > 0 && income > 0
+          ? safe(ingredientsCurr, income) - safe(ingredientsPrev, prevIncome)
+          : null,
+      href: '/expenses',
+    },
+    {
+      // 메뉴별 원가 룰(/recipes 등록률 80%+) 도입 후 활성
       label: '원가율',
       amount: 0,
       ratio: 0,
@@ -74,16 +79,6 @@ export default function DeficitSignals({
       delta:
         prevIncome > 0 && income > 0
           ? safe(fixedCurr, income) - safe(fixedPrev, prevIncome)
-          : null,
-      href: '/expenses',
-    },
-    {
-      label: '카드대금율',
-      amount: cardCurr,
-      ratio: safe(cardCurr, income),
-      delta:
-        prevIncome > 0 && income > 0
-          ? safe(cardCurr, income) - safe(cardPrev, prevIncome)
           : null,
       href: '/expenses',
     },

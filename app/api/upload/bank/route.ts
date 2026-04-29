@@ -90,8 +90,9 @@ function classifyRow(memo: string, counterpart: string, isIncome: boolean): {
     return { category: 'ingredients_card', type: 'expense' }
   }
 
-  // 나머지 출금 → 카드대금 (기본값)
-  return { category: 'card', type: 'expense' }
+  // 나머지 출금 → 재료비(카드) 기본값
+  // (카드사 묶음결제는 사실상 재료 — 점장 수동분류 패턴을 자동화. outlier는 ReclassifyTable에서 옮김)
+  return { category: 'ingredients_card', type: 'expense' }
 }
 
 // 콤마 포함 문자열 숫자 파싱

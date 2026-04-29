@@ -8,7 +8,6 @@ const CATEGORY_OPTIONS_EXPENSE = [
   { value: 'labor', label: '인건비' },
   { value: 'fixed', label: '고정비' },
   { value: 'equipment', label: '설비투자' },
-  { value: 'card', label: '카드대금' },
   { value: 'excluded', label: '제외' },
 ]
 

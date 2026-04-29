@@ -54,7 +54,6 @@ export async function getYearlyExpenseTrend(year: number) {
       labor: byMonth[m]?.labor ?? 0,
       fixed: byMonth[m]?.fixed ?? 0,
       equipment: byMonth[m]?.equipment ?? 0,
-      card: byMonth[m]?.card ?? 0,
     }
   }).filter((d) => Object.values(d).some((v, i) => i > 0 && v > 0)) // 데이터 있는 월만
 }
