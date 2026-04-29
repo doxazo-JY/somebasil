@@ -125,25 +125,65 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
 
-  // cellDates: true → Excel 날짜 시리얼을 JS Date로 자동 변환
-  // 모바일 하나은행 export가 HTML 위장 .xls 인 케이스 대비 — 1차 array, 실패 시 binary로 재시도
-  let workbook: XLSX.WorkBook
-  try {
-    workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
-  } catch (err) {
+  // 파일 시그니처 감지 (하나은행이 HTML/XML 위장 .xlsx로 export하는 경우 대응)
+  // - PK (50 4B) = 진짜 xlsx (zip)
+  // - D0 CF 11 E0 = 구형 .xls (CFB)
+  // - < (3C) = HTML/XML
+  const sig = bytes.slice(0, 4)
+  const isZip = sig[0] === 0x50 && sig[1] === 0x4b
+  const isCfb = sig[0] === 0xd0 && sig[1] === 0xcf
+  const isText = sig[0] === 0x3c || sig[0] === 0xef /* UTF-8 BOM */
+
+  let workbook: XLSX.WorkBook | null = null
+  let lastErr: unknown = null
+
+  // 시그니처 기반으로 우선 시도
+  const attempts: Array<() => XLSX.WorkBook> = []
+  if (isZip) {
+    attempts.push(() => XLSX.read(buffer, { type: 'array', cellDates: true }))
+  } else if (isCfb) {
+    attempts.push(() => XLSX.read(bytes, { type: 'array', cellDates: true }))
+  } else if (isText) {
+    // HTML/XML 위장 — string으로 읽어서 HTML 파서 사용
+    const text = new TextDecoder('utf-8').decode(bytes)
+    attempts.push(() => XLSX.read(text, { type: 'string', cellDates: true }))
+    // EUC-KR 가능성 (한국 은행 레거시)
+    attempts.push(() => {
+      const eucText = new TextDecoder('euc-kr').decode(bytes)
+      return XLSX.read(eucText, { type: 'string', cellDates: true })
+    })
+  }
+  // 시그니처 모르겠으면 전부 시도
+  if (attempts.length === 0) {
+    attempts.push(() => XLSX.read(buffer, { type: 'array', cellDates: true }))
+    attempts.push(() => XLSX.read(bytes, { type: 'array', cellDates: true }))
+    attempts.push(() => {
+      const text = new TextDecoder('utf-8').decode(bytes)
+      return XLSX.read(text, { type: 'string', cellDates: true })
+    })
+  }
+
+  for (const attempt of attempts) {
     try {
-      workbook = XLSX.read(new Uint8Array(buffer), { type: 'binary', cellDates: true })
-    } catch (err2) {
-      const msg = err2 instanceof Error ? err2.message : String(err2)
-      console.error('[bank-upload] XLSX.read 실패', { name: file.name, size: file.size, msg })
-      return NextResponse.json(
-        {
-          error: `엑셀 파일 형식을 읽을 수 없습니다. 하나은행 PC 사이트에서 직접 다운받은 .xlsx 파일인지 확인해주세요. (file: ${file.name}, ${file.size}B, ${msg})`,
-        },
-        { status: 400 },
-      )
+      workbook = attempt()
+      break
+    } catch (err) {
+      lastErr = err
     }
+  }
+
+  if (!workbook) {
+    const msg = lastErr instanceof Error ? lastErr.message : String(lastErr)
+    const sigHex = Array.from(sig).map((b) => b.toString(16).padStart(2, '0')).join(' ')
+    console.error('[bank-upload] XLSX.read 실패', { name: file.name, size: file.size, sig: sigHex, msg })
+    return NextResponse.json(
+      {
+        error: `엑셀 파일 형식을 읽을 수 없습니다. 하나은행 PC 사이트에서 직접 다운받은 .xlsx 파일인지 확인해주세요. (file: ${file.name}, ${file.size}B, sig: ${sigHex}, ${msg})`,
+      },
+      { status: 400 },
+    )
   }
 
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
