@@ -48,7 +48,13 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const fixed = expensesByCategory.fixed ?? 0
   const equipment = expensesByCategory.equipment ?? 0
   const card = expensesByCategory.card ?? 0
-  const totalExpense = labor + ingredients + fixed + equipment + card
+  // 헤드라인 합계는 monthly_summary.total_expense 사용 (대시보드와 일치).
+  // - manual_adjustments(수동 조정) 반영됨
+  // - 'excluded' 카테고리 항상 제외됨
+  // 카테고리 합산(labor + ingredients + ...)과는 manual_adjustments 만큼 차이 날 수 있음.
+  const categorySum = labor + ingredients + fixed + equipment + card
+  const totalExpense = summary?.total_expense ?? categorySum
+  const adjustmentDelta = totalExpense - categorySum
 
   // 연간 누적 지출 (설비투자 포함)
   const cumExpense = trend.reduce(
@@ -160,6 +166,11 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
       <div className="bg-gray-50 rounded-xl border border-gray-100 px-6 py-3 mb-6 flex flex-wrap gap-4 sm:gap-8 text-sm">
         <span className="text-gray-400">{month}월 지출</span>
         <span>합계 <strong className="text-gray-800">{formatManwon(totalExpense)}</strong></span>
+        {Math.abs(adjustmentDelta) > 0 && (
+          <span className="text-[11px] text-gray-400 self-center [word-break:keep-all]">
+            (카테고리 {formatManwon(categorySum)} {adjustmentDelta >= 0 ? '+' : '−'} 수동조정 {formatManwon(Math.abs(adjustmentDelta))})
+          </span>
+        )}
         {income > 0 && (
           <span className={`text-xs self-center font-medium ${totalExpense > income ? 'text-red-500' : 'text-[#1a5c3a]'}`}>
             매출 대비 {((totalExpense / income) * 100).toFixed(0)}%

@@ -3,9 +3,10 @@ import { fetchAllRows } from './fetchAll'
 
 // 월별 monthly_summary 재계산 유틸
 // - income  = daily_sales (POS 우선) + 수동 수입 조정
-// - expense = monthly_expenses (excluded 제외 — 단 대표 토글 on이면 포함) + 수동 지출 조정
+// - expense = monthly_expenses (excluded는 항상 제외) + 수동 지출 조정
 //
-// 대표 토글(system_settings.include_owner_personal)과 manual_adjustments 변경 시 호출
+// monthly_expenses 변경 / manual_adjustments 변경 시 호출
+// (대시보드와 /expenses 가 같은 total_expense를 보도록 단일 source-of-truth)
 export async function recalcMonthlySummary(
   supabase: ReturnType<typeof createServerClient>,
   year: number,
@@ -15,14 +16,6 @@ export async function recalcMonthlySummary(
   const endMonth = month === 12 ? 1 : month + 1
   const endYear = month === 12 ? year + 1 : year
   const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
-
-  // 대표 토글 상태
-  const { data: settingRow } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'include_owner_personal')
-    .single()
-  const includeOwner = settingRow?.value === true
 
   // 수입 — POS 우선 (날짜별 pos 있으면 pos만)
   const salesRows = await fetchAllRows<{ date: string; amount: number; source: string }>(
@@ -46,17 +39,17 @@ export async function recalcMonthlySummary(
     0,
   )
 
-  // 지출 — excluded 제외 (토글 on이면 포함)
-  let expenseQuery = supabase
-    .from('monthly_expenses')
-    .select('amount')
-    .eq('year', year)
-    .eq('month', month)
-  if (!includeOwner) {
-    expenseQuery = expenseQuery.neq('category', 'excluded')
-  }
+  // 지출 — 'excluded' 카테고리는 항상 제외 (사용자 의도상 excluded = "지출 아님")
+  // ※ 과거 include_owner_personal 토글로 분기했으나 사용자 혼란 야기로 제거.
+  //    /expenses 페이지의 카테고리 직접 합산도 항상 excluded 제외로 동일.
   const expenseRows = await fetchAllRows<{ amount: number }>((from, to) =>
-    expenseQuery.range(from, to),
+    supabase
+      .from('monthly_expenses')
+      .select('amount')
+      .eq('year', year)
+      .eq('month', month)
+      .neq('category', 'excluded')
+      .range(from, to),
   )
   const baseExpense = expenseRows.reduce((s, r) => s + (r.amount ?? 0), 0)
 

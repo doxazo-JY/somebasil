@@ -105,7 +105,7 @@
 
 ### system_settings — 범용 키/값 설정
 - key (text PK), value (jsonb), updated_at
-- 예: `include_owner_personal` (대표 개인 거래 포함 토글)
+- (현재 활성 키 없음. `include_owner_personal`은 4/29 제거 — 'excluded' 카테고리는 항상 제외로 통일)
 
 ### manual_adjustments — 수동 수입/지출 조정
 - id, date, type ('income' | 'expense'), direction ('add' | 'subtract'), amount, memo
