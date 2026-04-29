@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
+// @ts-expect-error — xlsx-populate는 타입 정의 없음
+import XlsxPopulate from 'xlsx-populate'
+
+// Node.js 런타임 강제 (xlsx-populate는 Buffer/Node crypto 사용)
+export const runtime = 'nodejs'
+
+// 하나은행 다운로드 파일에 걸려 있는 고정 암호. 점장 생년월일 6자리.
+// 변경 필요 시 Vercel 환경변수 BANK_FILE_PASSWORD로 override 가능.
+const BANK_FILE_PASSWORD = process.env.BANK_FILE_PASSWORD || '710320'
 
 // 파싱된 거래 행 타입
 export interface BankRow {
@@ -125,44 +134,53 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = await file.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
+  let bytes = new Uint8Array(buffer)
 
-  // 파일 시그니처 감지 (하나은행이 HTML/XML 위장 .xlsx로 export하는 경우 대응)
+  // 파일 시그니처 감지
   // - PK (50 4B) = 진짜 xlsx (zip)
-  // - D0 CF 11 E0 = 구형 .xls (CFB)
+  // - D0 CF 11 E0 = CFB (구형 .xls 또는 암호 걸린 modern xlsx — Excel은 암호 보호 시 OOXML을 CFB로 감쌈)
   // - < (3C) = HTML/XML
   const sig = bytes.slice(0, 4)
-  const isZip = sig[0] === 0x50 && sig[1] === 0x4b
   const isCfb = sig[0] === 0xd0 && sig[1] === 0xcf
   const isText = sig[0] === 0x3c || sig[0] === 0xef /* UTF-8 BOM */
 
   let workbook: XLSX.WorkBook | null = null
   let lastErr: unknown = null
+  let decryptedFromCfb = false
 
-  // 시그니처 기반으로 우선 시도
+  // CFB면 먼저 암호 복호화 시도 (하나은행 다운로드 파일은 기본 암호 걸려 있음)
+  if (isCfb) {
+    try {
+      const wb = await XlsxPopulate.fromDataAsync(Buffer.from(buffer), { password: BANK_FILE_PASSWORD })
+      const decrypted = await wb.outputAsync('nodebuffer')
+      bytes = new Uint8Array(decrypted) // SheetJS에 넘길 바이트 교체
+      decryptedFromCfb = true
+    } catch (err) {
+      // 복호화 실패 — 암호 안 걸린 그냥 .xls일 수 있으므로 SheetJS에 그대로 시도
+      lastErr = err
+    }
+  }
+
+  const decryptedBuffer = decryptedFromCfb ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : buffer
+
   const attempts: Array<() => XLSX.WorkBook> = []
-  if (isZip) {
-    attempts.push(() => XLSX.read(buffer, { type: 'array', cellDates: true }))
+  if (decryptedFromCfb) {
+    // 복호화된 zip(.xlsx) → array로 읽기
+    attempts.push(() => XLSX.read(decryptedBuffer, { type: 'array', cellDates: true }))
   } else if (isCfb) {
+    // 암호 안 걸린 구형 .xls
     attempts.push(() => XLSX.read(bytes, { type: 'array', cellDates: true }))
   } else if (isText) {
-    // HTML/XML 위장 — string으로 읽어서 HTML 파서 사용
     const text = new TextDecoder('utf-8').decode(bytes)
     attempts.push(() => XLSX.read(text, { type: 'string', cellDates: true }))
-    // EUC-KR 가능성 (한국 은행 레거시)
     attempts.push(() => {
       const eucText = new TextDecoder('euc-kr').decode(bytes)
       return XLSX.read(eucText, { type: 'string', cellDates: true })
     })
-  }
-  // 시그니처 모르겠으면 전부 시도
-  if (attempts.length === 0) {
+  } else {
+    // 진짜 xlsx (PK 시그니처) 또는 미상
     attempts.push(() => XLSX.read(buffer, { type: 'array', cellDates: true }))
     attempts.push(() => XLSX.read(bytes, { type: 'array', cellDates: true }))
-    attempts.push(() => {
-      const text = new TextDecoder('utf-8').decode(bytes)
-      return XLSX.read(text, { type: 'string', cellDates: true })
-    })
   }
 
   for (const attempt of attempts) {
