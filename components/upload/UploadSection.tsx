@@ -26,6 +26,15 @@ interface RecipeUploadStats {
   packagingSetCount: number
 }
 
+// fetch 응답이 JSON이 아닐 때(서버 502/504 HTML 페이지 등) 안전하게 파싱
+async function safeJson(res: Response): Promise<any> {
+  try {
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
 function bankRowToPreview(row: BankRow): PreviewRow {
   return {
     date: row.date,
@@ -62,49 +71,55 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
     const formData = new FormData()
     formData.append('file', file)
 
-    // 레시피 탭: 파싱 + 저장이 한 번에 (파일 크고 시트 4개라 미리보기 생략)
-    if (tab === 'recipe') {
-      const res = await fetch('/api/upload/recipe', { method: 'POST', body: formData })
-      const json = await res.json()
-      setLoading(false)
-      if (!res.ok) {
-        setMessage({ text: json.error ?? '업로드 실패', ok: false })
+    try {
+      // 레시피 탭: 파싱 + 저장이 한 번에 (파일 크고 시트 4개라 미리보기 생략)
+      if (tab === 'recipe') {
+        const res = await fetch('/api/upload/recipe', { method: 'POST', body: formData })
+        const json = await safeJson(res)
+        if (!res.ok) {
+          setMessage({ text: json?.error ?? `업로드 실패 (${res.status})`, ok: false })
+          return
+        }
+        setRecipeStats(json.stats as RecipeUploadStats)
+        setMessage({ text: '저장 완료! 메뉴 원가 페이지에서 확인하세요.', ok: true })
+        router.refresh()
         return
       }
-      setRecipeStats(json.stats as RecipeUploadStats)
-      setMessage({ text: '저장 완료! 메뉴 원가 페이지에서 확인하세요.', ok: true })
-      router.refresh()
-      return
-    }
 
-    const endpointMap = {
-      daily: '/api/upload/daily-sales',
-      bank: '/api/upload/bank',
-      menu: '/api/upload/menu',
-    } as const
-    const res = await fetch(endpointMap[tab], { method: 'POST', body: formData })
-    const json = await res.json()
+      const endpointMap = {
+        daily: '/api/upload/daily-sales',
+        bank: '/api/upload/bank',
+        menu: '/api/upload/menu',
+      } as const
+      const res = await fetch(endpointMap[tab], { method: 'POST', body: formData })
+      const json = await safeJson(res)
 
-    setLoading(false)
+      if (!res.ok) {
+        setMessage({ text: json?.error ?? `파싱 실패 (${res.status})`, ok: false })
+        return
+      }
 
-    if (!res.ok) {
-      setMessage({ text: json.error ?? '파싱 실패', ok: false })
-      return
-    }
+      setFilename(json.filename)
 
-    setFilename(json.filename)
-
-    if (tab === 'daily') {
-      setPreview({ type: 'daily', rows: json.rows as DailySalesRow[] })
-    } else if (tab === 'bank') {
-      const originals = json.rows as BankRow[]
-      setPreview({
-        type: 'bank',
-        rows: originals.map(bankRowToPreview),
-        originals,
-      })
-    } else if (tab === 'menu') {
-      setPreview({ type: 'menu', rows: json.rows as MenuRow[] })
+      if (tab === 'daily') {
+        setPreview({ type: 'daily', rows: json.rows as DailySalesRow[] })
+      } else if (tab === 'bank') {
+        const originals = json.rows as BankRow[]
+        setPreview({
+          type: 'bank',
+          rows: originals.map(bankRowToPreview),
+          originals,
+        })
+      } else if (tab === 'menu') {
+        setPreview({ type: 'menu', rows: json.rows as MenuRow[] })
+      }
+    } catch (err) {
+      // 네트워크 끊김 / 타임아웃 / JSON 파싱 실패 — 모바일에서 흔함
+      console.error('[upload]', err)
+      const msg = err instanceof Error ? err.message : '알 수 없는 오류'
+      setMessage({ text: `업로드 실패: ${msg} (네트워크 확인 후 재시도)`, ok: false })
+    } finally {
+      setLoading(false)
     }
   }
 
