@@ -178,6 +178,19 @@ export async function POST(req: NextRequest) {
     const msg = lastErr instanceof Error ? lastErr.message : String(lastErr)
     const sigHex = Array.from(sig).map((b) => b.toString(16).padStart(2, '0')).join(' ')
     console.error('[bank-upload] XLSX.read 실패', { name: file.name, size: file.size, sig: sigHex, msg })
+
+    // 암호 걸린 파일 — 점장이 알아볼 수 있는 메시지로
+    if (msg.includes('password')) {
+      return NextResponse.json(
+        {
+          error:
+            '🔒 암호가 걸린 파일입니다. 하나은행에서 다운받을 때 "암호 설정"을 해제하거나, ' +
+            '엑셀에서 파일 열고 "다른 이름으로 저장 → .xlsx" 형식으로 암호 없이 저장한 뒤 다시 올려주세요.',
+        },
+        { status: 400 },
+      )
+    }
+
     return NextResponse.json(
       {
         error: `엑셀 파일 형식을 읽을 수 없습니다. 하나은행 PC 사이트에서 직접 다운받은 .xlsx 파일인지 확인해주세요. (file: ${file.name}, ${file.size}B, sig: ${sigHex}, ${msg})`,
