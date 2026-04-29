@@ -32,6 +32,7 @@ interface IngredientRow {
 interface PriceRow {
   ingredient_id: number
   unit_price: number
+  set_size: number | null
   effective_date: string
 }
 
@@ -190,7 +191,7 @@ export async function getAllMenuCosts(asOfDate?: string): Promise<MenuCost[]> {
   ] = await Promise.all([
     supabase.from('products').select('id, name, price, is_active').eq('is_active', true),
     supabase.from('ingredients').select('id, name, unit, kind'),
-    supabase.from('ingredient_prices').select('ingredient_id, unit_price, effective_date'),
+    supabase.from('ingredient_prices').select('ingredient_id, unit_price, set_size, effective_date'),
     supabase.from('sub_recipes').select('id, output_ingredient_id, output_quantity'),
     supabase.from('sub_recipe_items').select('sub_recipe_id, ingredient_id, quantity'),
     supabase.from('recipes').select('product_name_normalized, ingredient_id, quantity'),
@@ -335,4 +336,219 @@ export function summarizeCosts(costs: MenuCost[]): CostSummary {
     missingPriceCount: missing,
     avgCostRatio: avg,
   }
+}
+
+// ─────────────────────────────────────────────
+// 재료 회수율 — /recipes 회수율 탭
+// 현금 4종(원두·우유·말차파우더·잠봉뵈르햄)만 거래 단위 추적 가능
+// 흐름: 마지막 매입 거래일 → 그 거래로 산 g 수 = amount/unit_price
+//       → 매입일 이후 N일간 그 재료 쓴 메뉴 마진 누적
+//       → 회수율 = 누적 마진 / 매입가
+// ─────────────────────────────────────────────
+
+const CASH_SUPPLIERS: { ingredient: string; counterpart: string }[] = [
+  { ingredient: '원두', counterpart: '홍인호' },
+  { ingredient: '말차파우더', counterpart: '김인성' },
+  { ingredient: '우유', counterpart: '한성욱' },
+  { ingredient: '잠봉뵈르햄', counterpart: '소금집' },
+]
+
+export interface IngredientRecovery {
+  ingredientId: number
+  ingredientName: string
+  counterpart: string
+  unit: string
+  unitPrice: number               // 원/단위
+  lastPurchaseDate: string | null // 'YYYY-MM-DD'
+  lastPurchaseAmount: number      // 마지막 매입 금액 (원)
+  estimatedQuantityBought: number // amount / unitPrice (g 등)
+  daysElapsed: number             // 마지막 매입일 ~ 오늘
+  estimatedUsedQty: number        // 그 기간 추정 사용량
+  progressRatio: number           // estimatedUsedQty / estimatedQuantityBought
+  cumulativeMargin: number        // 그 기간 그 재료 쓰는 ok 메뉴 마진 누적
+  recoveryRatio: number | null    // cumulativeMargin / lastPurchaseAmount
+  menuCount: number
+}
+
+interface DailySalesAggRow {
+  product_name: string
+  quantity: number | null
+  date: string
+}
+
+interface ExpenseRow {
+  date: string | null
+  counterpart: string | null
+  amount: number
+}
+
+function ksTodayStr(): string {
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  return kst.toISOString().slice(0, 10)
+}
+
+function daysBetween(fromDate: string, toDate: string): number {
+  const a = new Date(fromDate + 'T00:00:00Z').getTime()
+  const b = new Date(toDate + 'T00:00:00Z').getTime()
+  return Math.max(1, Math.round((b - a) / (24 * 3600 * 1000)))
+}
+
+export async function getIngredientRecovery(
+  costs: MenuCost[],
+): Promise<IngredientRecovery[]> {
+  const supabase = createServerClient()
+  const today = ksTodayStr()
+
+  // ─── 데이터 일괄 로드 ───
+  const [
+    ingredientsRes,
+    pricesRes,
+    recipesRes,
+    expensesRes,
+  ] = await Promise.all([
+    supabase.from('ingredients').select('id, name, unit, kind, payment_method'),
+    supabase.from('ingredient_prices').select('ingredient_id, unit_price, set_size, effective_date'),
+    supabase.from('recipes').select('product_name_normalized, ingredient_id, quantity'),
+    // 현금 4종 거래만 — 마지막 매입일 찾기용
+    supabase
+      .from('monthly_expenses')
+      .select('date, counterpart, amount')
+      .in('counterpart', CASH_SUPPLIERS.map((s) => s.counterpart))
+      .order('date', { ascending: false })
+      .limit(200),
+  ])
+
+  type IngFull = { id: number; name: string; unit: string; kind: 'purchased' | 'made'; payment_method: 'cash' | 'card' | null }
+  const ingredients = (ingredientsRes.data ?? []) as IngFull[]
+  const prices = (pricesRes.data ?? []) as PriceRow[]
+  const recipes = (recipesRes.data ?? []) as RecipeRow[]
+  const expenses = (expensesRes.data ?? []) as ExpenseRow[]
+
+  const ingByName = new Map<string, IngFull>()
+  for (const i of ingredients) ingByName.set(i.name, i)
+
+  // 거래처별 마지막 매입 거래
+  const lastPurchaseByCounterpart = new Map<string, ExpenseRow>()
+  for (const e of expenses) {
+    if (!e.counterpart || !e.date) continue
+    if (!lastPurchaseByCounterpart.has(e.counterpart)) {
+      lastPurchaseByCounterpart.set(e.counterpart, e)
+    }
+  }
+
+  // 메뉴 → ok 메뉴 마진 (normalized 키)
+  const marginByMenu = new Map<string, number>()
+  for (const c of costs) {
+    if (c.status !== 'ok' || c.margin == null) continue
+    const key = stripVariantSuffix(c.productName)
+    const prev = marginByMenu.get(key)
+    marginByMenu.set(key, prev != null ? (prev + c.margin) / 2 : c.margin)
+  }
+
+  // 재료 → 그 재료 쓰는 메뉴 레시피
+  const recipesByIngredient = new Map<number, RecipeRow[]>()
+  for (const r of recipes) {
+    const arr = recipesByIngredient.get(r.ingredient_id) ?? []
+    arr.push(r)
+    recipesByIngredient.set(r.ingredient_id, arr)
+  }
+
+  // 재료별 최신 단가
+  function latestPriceRow(ingredientId: number): PriceRow | null {
+    return (
+      prices
+        .filter((p) => p.ingredient_id === ingredientId && p.effective_date <= today)
+        .sort((a, b) => b.effective_date.localeCompare(a.effective_date))[0] ?? null
+    )
+  }
+
+  // 매입일 ~ 오늘까지 daily_sales 한 번에 가져오기 (가장 오래된 매입일 기준)
+  let oldestSinceDate = today
+  for (const ex of lastPurchaseByCounterpart.values()) {
+    if (ex.date && ex.date < oldestSinceDate) oldestSinceDate = ex.date
+  }
+  const salesRes = await supabase
+    .from('daily_sales')
+    .select('product_name, quantity, date')
+    .gte('date', oldestSinceDate)
+    .lte('date', today)
+    .eq('source', 'pos')
+    .limit(50000)
+  const sales = (salesRes.data ?? []) as DailySalesAggRow[]
+
+  // 메뉴 × 날짜별 잔수 — 매입일 이후 필터용
+  function totalQtySince(menuKey: string, sinceDate: string): number {
+    let total = 0
+    for (const s of sales) {
+      if (!s.product_name || s.date < sinceDate) continue
+      if (stripVariantSuffix(s.product_name) === menuKey) {
+        total += s.quantity ?? 0
+      }
+    }
+    return total
+  }
+
+  const result: IngredientRecovery[] = []
+  for (const supplier of CASH_SUPPLIERS) {
+    const ing = ingByName.get(supplier.ingredient)
+    if (!ing) continue
+    const priceRow = latestPriceRow(ing.id)
+    if (!priceRow) continue
+    const lastEx = lastPurchaseByCounterpart.get(supplier.counterpart)
+
+    const unitPrice = priceRow.unit_price
+    const lastPurchaseDate = lastEx?.date ?? null
+    const lastPurchaseAmount = lastEx?.amount ?? 0
+    const estimatedQuantityBought =
+      lastPurchaseAmount > 0 && unitPrice > 0 ? lastPurchaseAmount / unitPrice : 0
+    const daysElapsed = lastPurchaseDate ? daysBetween(lastPurchaseDate, today) : 0
+
+    const menuRecipes = recipesByIngredient.get(ing.id) ?? []
+
+    let estimatedUsedQty = 0
+    let cumulativeMargin = 0
+    if (lastPurchaseDate) {
+      for (const mr of menuRecipes) {
+        const qty = totalQtySince(mr.product_name_normalized, lastPurchaseDate)
+        estimatedUsedQty += qty * mr.quantity
+        const margin = marginByMenu.get(mr.product_name_normalized)
+        if (margin != null) {
+          cumulativeMargin += qty * margin
+        }
+      }
+    }
+
+    const progressRatio =
+      estimatedQuantityBought > 0 ? estimatedUsedQty / estimatedQuantityBought : 0
+    const recoveryRatio =
+      lastPurchaseAmount > 0 ? cumulativeMargin / lastPurchaseAmount : null
+
+    result.push({
+      ingredientId: ing.id,
+      ingredientName: ing.name,
+      counterpart: supplier.counterpart,
+      unit: ing.unit,
+      unitPrice,
+      lastPurchaseDate,
+      lastPurchaseAmount,
+      estimatedQuantityBought,
+      daysElapsed,
+      estimatedUsedQty,
+      progressRatio,
+      cumulativeMargin,
+      recoveryRatio,
+      menuCount: menuRecipes.length,
+    })
+  }
+
+  // 회수율 desc, null은 뒤
+  result.sort((a, b) => {
+    if (a.recoveryRatio == null && b.recoveryRatio == null) return 0
+    if (a.recoveryRatio == null) return 1
+    if (b.recoveryRatio == null) return -1
+    return b.recoveryRatio - a.recoveryRatio
+  })
+
+  return result
 }

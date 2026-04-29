@@ -52,6 +52,7 @@ interface IngredientParsed {
   kind: 'purchased' | 'made'
   payment_method: 'cash' | 'card' | null
   unit_price: number | null
+  set_size: number | null   // 1세트 용량 (봉지 단위 회수율 계산용)
   effective_date: string | null
 }
 
@@ -81,7 +82,11 @@ function parseIngredients(rows: unknown[][]): IngredientParsed[] {
     }
     const dateRaw = asString(r[8])
     const effective_date = /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : null
-    result.push({ name, unit, kind, payment_method, unit_price, effective_date })
+    result.push({
+      name, unit, kind, payment_method, unit_price,
+      set_size: kind === 'purchased' ? setSize : null,
+      effective_date,
+    })
   }
   return result
 }
@@ -207,6 +212,7 @@ export async function POST(req: NextRequest) {
     .map((ing) => ({
       ingredient_id: ingByName.get(ing.name)!,
       unit_price: ing.unit_price!,
+      set_size: ing.set_size,
       effective_date: ing.effective_date!,
     }))
   if (priceRows.length > 0) {

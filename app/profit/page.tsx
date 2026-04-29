@@ -4,7 +4,13 @@ import ProfitStatCards from '@/components/profit/ProfitStatCards'
 import ProfitTrendChart from '@/components/profit/ProfitTrendChart'
 import MonthlyBreakdownTable from '@/components/profit/MonthlyBreakdownTable'
 import BreakEvenSection from '@/components/profit/BreakEvenSection'
+import MarginBreakdown from '@/components/profit/MarginBreakdown'
 import { getYearlySummary, getMemosForYear } from '@/lib/supabase/queries/dashboard'
+import { getYearlyMaterialMetrics } from '@/lib/supabase/queries/material-cost'
+
+// 마진 분해 표시 임계값 — 등록 메뉴 매출 비중이 이 값 이상이어야 신뢰
+// 80% = 메인 메뉴 거의 다 등록. 미만이면 등록 안 된 메뉴 자재비가 빠져서 과소평가
+const MATERIAL_RELIABLE_THRESHOLD = 0.8
 
 export const dynamic = 'force-dynamic'
 
@@ -22,15 +28,25 @@ export default async function ProfitPage({ searchParams }: PageProps) {
   const now = new Date()
   const year = Number(params.year ?? now.getFullYear())
 
-  const [yearlySummary, memos] = await Promise.all([
+  const [yearlySummary, memos, materialMetricsByMonth] = await Promise.all([
     getYearlySummary(year),
     getMemosForYear(year),
+    getYearlyMaterialMetrics(year),
   ])
 
   // YTD 누적
   const ytdIncome = yearlySummary.reduce((s, d) => s + d.income, 0)
   const ytdExpense = yearlySummary.reduce((s, d) => s + d.total_expense, 0)
   const ytdProfit = yearlySummary.reduce((s, d) => s + d.profit, 0)
+  const ytdMaterial = [...materialMetricsByMonth.values()].reduce((s, m) => s + m.material, 0)
+  const ytdOkSales = [...materialMetricsByMonth.values()].reduce((s, m) => s + m.okSales, 0)
+  const okSalesRatio = ytdIncome > 0 ? ytdOkSales / ytdIncome : 0
+  const isReliable = okSalesRatio >= MATERIAL_RELIABLE_THRESHOLD
+
+  // material 컬럼/카드/분해 표시는 등록률 50%+ 일 때만
+  const materialByMonth = isReliable
+    ? new Map([...materialMetricsByMonth.entries()].map(([m, v]) => [m, v.material]))
+    : undefined
 
   // 데이터 있는 월 수 (월평균 계산용)
   const monthsWithData = yearlySummary.filter(
@@ -63,6 +79,7 @@ export default async function ProfitPage({ searchParams }: PageProps) {
           ytdExpense={ytdExpense}
           ytdProfit={ytdProfit}
           monthsWithData={monthsWithData}
+          ytdMaterialCost={isReliable ? ytdMaterial : undefined}
         />
         <div className="col-span-2 sm:col-span-3 lg:col-span-3">
           <BreakEvenSection
@@ -80,6 +97,15 @@ export default async function ProfitPage({ searchParams }: PageProps) {
         <span>
           매출 <strong className="text-gray-800">{formatManwon(ytdIncome)}</strong>
         </span>
+        {isReliable && ytdMaterial > 0 && (
+          <span>
+            자재비{' '}
+            <strong className="text-gray-800">{formatManwon(ytdMaterial)}</strong>
+            <span className="text-gray-400 ml-1 text-xs">
+              ({((ytdMaterial / ytdIncome) * 100).toFixed(1)}%)
+            </span>
+          </span>
+        )}
         <span>
           지출 <strong className="text-gray-800">{formatManwon(ytdExpense)}</strong>
         </span>
@@ -96,10 +122,36 @@ export default async function ProfitPage({ searchParams }: PageProps) {
         )}
       </div>
 
+      {/* 마진 분해 — 매출에서 자재비 빼고 남는 돈 흐름 */}
+      {ytdIncome > 0 && (
+        isReliable ? (
+          <MarginBreakdown
+            income={ytdIncome}
+            material={ytdMaterial}
+            totalExpense={ytdExpense}
+            okSalesRatio={okSalesRatio}
+          />
+        ) : (
+          <div className="bg-gray-50 rounded-xl border border-gray-100 p-5 mb-4 text-sm text-gray-500 [word-break:keep-all]">
+            <p className="font-semibold text-gray-700 mb-1">마진 분해 (잠금)</p>
+            <p className="text-xs text-gray-400">
+              메뉴 원가 데이터가 충분히 채워지면 표시됩니다 — 현재 등록 메뉴 매출 비중{' '}
+              <strong className="text-gray-700">{(okSalesRatio * 100).toFixed(1)}%</strong>
+              {' / '}임계값 50%
+            </p>
+          </div>
+        )
+      )}
+
       {/* 수입·지출·이익 추이 + 월별 손익 테이블 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <ProfitTrendChart data={yearlySummary} />
-        <MonthlyBreakdownTable data={yearlySummary} year={year} memos={memos} />
+        <MonthlyBreakdownTable
+          data={yearlySummary}
+          year={year}
+          memos={memos}
+          materialByMonth={materialByMonth}
+        />
       </div>
     </div>
   )

@@ -1,0 +1,226 @@
+[
+  {
+    "rank": 1,
+    "name": "아메리카노",
+    "category": "coffee",
+    "qty": 1395,
+    "amount": 5594000,
+    "cum_ratio": 17.3
+  },
+  {
+    "rank": 2,
+    "name": "말차 라떼",
+    "category": "matcha",
+    "qty": 418,
+    "amount": 2995000,
+    "cum_ratio": 26.5
+  },
+  {
+    "rank": 3,
+    "name": "카페라떼",
+    "category": "coffee",
+    "qty": 552,
+    "amount": 2490500,
+    "cum_ratio": 34.2
+  },
+  {
+    "rank": 4,
+    "name": "바스크 치즈케익",
+    "category": "dessert",
+    "qty": 296,
+    "amount": 1776000,
+    "cum_ratio": 39.7
+  },
+  {
+    "rank": 5,
+    "name": "딸기라떼",
+    "category": "beverage",
+    "qty": 313,
+    "amount": 1252000,
+    "cum_ratio": 43.5
+  },
+  {
+    "rank": 6,
+    "name": "리얼바닐라빈라떼",
+    "category": "coffee",
+    "qty": 167,
+    "amount": 918500,
+    "cum_ratio": 46.3
+  },
+  {
+    "rank": 7,
+    "name": "핸드드립",
+    "category": "drip_coffee",
+    "qty": 101,
+    "amount": 814000,
+    "cum_ratio": 48.9
+  },
+  {
+    "rank": 8,
+    "name": "레몬 마들렌",
+    "category": "dessert",
+    "qty": 496,
+    "amount": 744000,
+    "cum_ratio": 51.2
+  },
+  {
+    "rank": 9,
+    "name": "드립백 B",
+    "category": "coffee",
+    "qty": 49,
+    "amount": 732000,
+    "cum_ratio": 53.4
+  },
+  {
+    "rank": 10,
+    "name": "호두파이",
+    "category": "dessert",
+    "qty": 208,
+    "amount": 728000,
+    "cum_ratio": 55.7
+  },
+  {
+    "rank": 11,
+    "name": "도원결의 에이드",
+    "category": "ade",
+    "qty": 115,
+    "amount": 714000,
+    "cum_ratio": 57.9
+  },
+  {
+    "rank": 12,
+    "name": "교토 말차 세트",
+    "category": "matcha",
+    "qty": 47,
+    "amount": 624000,
+    "cum_ratio": 59.8
+  },
+  {
+    "rank": 13,
+    "name": "플레인스콘",
+    "category": "dessert",
+    "qty": 168,
+    "amount": 588000,
+    "cum_ratio": 61.6
+  },
+  {
+    "rank": 14,
+    "name": "초코 쿠키 박스",
+    "category": "dessert",
+    "qty": 94,
+    "amount": 573500,
+    "cum_ratio": 63.4
+  },
+  {
+    "rank": 15,
+    "name": "말차 티라미수",
+    "category": "dessert",
+    "qty": 68,
+    "amount": 491000,
+    "cum_ratio": 64.9
+  },
+  {
+    "rank": 16,
+    "name": "말차 티라미수(미니)",
+    "category": "dessert",
+    "qty": 120,
+    "amount": 480000,
+    "cum_ratio": 66.4
+  },
+  {
+    "rank": 17,
+    "name": "레몬티",
+    "category": "tea",
+    "qty": 84,
+    "amount": 476000,
+    "cum_ratio": 67.8
+  },
+  {
+    "rank": 18,
+    "name": "자몽에이드",
+    "category": "ade",
+    "qty": 72,
+    "amount": 450000,
+    "cum_ratio": 69.2
+  },
+  {
+    "rank": 19,
+    "name": "아이스초코",
+    "category": "beverage",
+    "qty": 104,
+    "amount": 416000,
+    "cum_ratio": 70.5
+  },
+  {
+    "rank": 20,
+    "name": "아인슈페너",
+    "category": "coffee",
+    "qty": 68,
+    "amount": 411000,
+    "cum_ratio": 71.8
+  },
+  {
+    "rank": 21,
+    "name": "구움과자세트",
+    "category": "dessert",
+    "qty": 41,
+    "amount": 410000,
+    "cum_ratio": 73.0
+  },
+  {
+    "rank": 22,
+    "name": "레몬에이드",
+    "category": "ade",
+    "qty": 58,
+    "amount": 368000,
+    "cum_ratio": 74.2
+  },
+  {
+    "rank": 23,
+    "name": "자몽티",
+    "category": "tea",
+    "qty": 65,
+    "amount": 368000,
+    "cum_ratio": 75.3
+  },
+  {
+    "rank": 24,
+    "name": "드립백 A",
+    "category": "coffee",
+    "qty": 49,
+    "amount": 367500,
+    "cum_ratio": 76.4
+  },
+  {
+    "rank": 25,
+    "name": "카라멜마끼아또",
+    "category": "coffee",
+    "qty": 64,
+    "amount": 352000,
+    "cum_ratio": 77.5
+  },
+  {
+    "rank": 26,
+    "name": "말차 크림",
+    "category": "matcha",
+    "qty": 49,
+    "amount": 349000,
+    "cum_ratio": 78.6
+  },
+  {
+    "rank": 27,
+    "name": "잠봉뵈르&고메버터 베이글 샌드위치",
+    "category": "dessert",
+    "qty": 41,
+    "amount": 342000,
+    "cum_ratio": 79.7
+  },
+  {
+    "rank": 28,
+    "name": "미니 마들렌 박스",
+    "category": "dessert",
+    "qty": 95,
+    "amount": 332500,
+    "cum_ratio": 80.7
+  }
+]
