@@ -2,10 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { ManualAdjustment } from '@/lib/supabase/queries/adjustments'
+import type { ManualAdjustment, AdjustmentType } from '@/lib/supabase/queries/adjustments'
 
 interface Props {
   items: ManualAdjustment[]
+}
+
+// 타입 라벨 — UI 일관용
+const TYPE_LABEL: Record<AdjustmentType, string> = {
+  income: 'POS 수입',
+  bank_income: '통장 수입',
+  expense: '통장 지출',
 }
 
 export default function ManualAdjustments({ items }: Props) {
@@ -17,7 +24,7 @@ export default function ManualAdjustments({ items }: Props) {
 
   const [form, setForm] = useState<{
     date: string
-    type: 'income' | 'expense'
+    type: AdjustmentType
     direction: 'add' | 'subtract'
     amount: string
     memo: string
@@ -65,18 +72,20 @@ export default function ManualAdjustments({ items }: Props) {
     router.refresh()
   }
 
-  const totalIncomeAdd = items
-    .filter((i) => i.type === 'income' && i.direction === 'add')
-    .reduce((s, i) => s + i.amount, 0)
-  const totalIncomeSub = items
-    .filter((i) => i.type === 'income' && i.direction === 'subtract')
-    .reduce((s, i) => s + i.amount, 0)
-  const totalExpenseAdd = items
-    .filter((i) => i.type === 'expense' && i.direction === 'add')
-    .reduce((s, i) => s + i.amount, 0)
-  const totalExpenseSub = items
-    .filter((i) => i.type === 'expense' && i.direction === 'subtract')
-    .reduce((s, i) => s + i.amount, 0)
+  // 6개 셀 합계
+  const sumOf = (type: AdjustmentType, dir: 'add' | 'subtract') =>
+    items
+      .filter((i) => i.type === type && i.direction === dir)
+      .reduce((s, i) => s + i.amount, 0)
+
+  const stats: { label: string; value: number; color: string }[] = [
+    { label: 'POS 수입 추가', value: sumOf('income', 'add'), color: 'text-[#1a5c3a]' },
+    { label: 'POS 수입 차감', value: sumOf('income', 'subtract'), color: 'text-gray-600' },
+    { label: '통장 수입 추가', value: sumOf('bank_income', 'add'), color: 'text-[#1a5c3a]' },
+    { label: '통장 수입 차감', value: sumOf('bank_income', 'subtract'), color: 'text-gray-600' },
+    { label: '통장 지출 추가', value: sumOf('expense', 'add'), color: 'text-red-500' },
+    { label: '통장 지출 차감', value: sumOf('expense', 'subtract'), color: 'text-gray-600' },
+  ]
 
   return (
     <div className="bg-white rounded-xl border border-gray-100">
@@ -97,32 +106,16 @@ export default function ManualAdjustments({ items }: Props) {
         )}
       </div>
 
-      {/* 요약 */}
-      <div className="px-5 py-3 border-b border-gray-50 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        <div>
-          <p className="text-gray-400">수입 추가</p>
-          <p className="font-semibold text-[#1a5c3a] mt-0.5">
-            +{Math.round(totalIncomeAdd / 10000)}만
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-400">수입 차감</p>
-          <p className="font-semibold text-gray-600 mt-0.5">
-            -{Math.round(totalIncomeSub / 10000)}만
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-400">지출 추가</p>
-          <p className="font-semibold text-red-500 mt-0.5">
-            +{Math.round(totalExpenseAdd / 10000)}만
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-400">지출 차감</p>
-          <p className="font-semibold text-gray-600 mt-0.5">
-            -{Math.round(totalExpenseSub / 10000)}만
-          </p>
-        </div>
+      {/* 요약 — 6개 */}
+      <div className="px-5 py-3 border-b border-gray-50 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+        {stats.map((s, idx) => (
+          <div key={idx}>
+            <p className="text-gray-400 [word-break:keep-all]">{s.label}</p>
+            <p className={`font-semibold ${s.color} mt-0.5 tabular-nums`}>
+              {s.label.endsWith('차감') ? '-' : '+'}{Math.round(s.value / 10000)}만
+            </p>
+          </div>
+        ))}
       </div>
 
       {adding && (
@@ -137,11 +130,12 @@ export default function ManualAdjustments({ items }: Props) {
             />
             <select
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as 'income' | 'expense' })}
+              onChange={(e) => setForm({ ...form, type: e.target.value as AdjustmentType })}
               className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]"
             >
-              <option value="expense">지출</option>
-              <option value="income">수입</option>
+              <option value="income">POS 수입</option>
+              <option value="bank_income">통장 수입</option>
+              <option value="expense">통장 지출</option>
             </select>
             <select
               value={form.direction}
@@ -204,18 +198,18 @@ export default function ManualAdjustments({ items }: Props) {
             <tbody className="divide-y divide-gray-50">
               {items.map((row) => {
                 const sign = row.direction === 'add' ? '+' : '-'
-                const isIncomeAdd = row.type === 'income' && row.direction === 'add'
-                const isExpenseAdd = row.type === 'expense' && row.direction === 'add'
-                const color = isIncomeAdd
+                const isAddIncome = row.direction === 'add' && (row.type === 'income' || row.type === 'bank_income')
+                const isAddExpense = row.direction === 'add' && row.type === 'expense'
+                const color = isAddIncome
                   ? 'text-[#1a5c3a]'
-                  : isExpenseAdd
+                  : isAddExpense
                     ? 'text-red-500'
                     : 'text-gray-600'
                 return (
                   <tr key={row.id} className="hover:bg-gray-50/50">
                     <td className="px-4 py-2 text-gray-400 tabular-nums">{row.date}</td>
                     <td className="px-4 py-2 text-gray-600">
-                      {row.type === 'income' ? '수입' : '지출'} {row.direction === 'add' ? '추가' : '차감'}
+                      {TYPE_LABEL[row.type]} {row.direction === 'add' ? '추가' : '차감'}
                     </td>
                     <td className={`px-4 py-2 text-right tabular-nums font-medium ${color}`}>
                       {sign}{row.amount.toLocaleString()}원

@@ -60,12 +60,14 @@ export async function recalcMonthlySummary(
     .gte('date', startDate)
     .lt('date', endDate)
 
+  // 'income' = POS 수입 보정, 'expense' = 통장 지출 보정
+  // 'bank_income'은 monthly_summary에 영향 X — bank-income 쿼리에서 직접 합산
   let incomeDelta = 0
   let expenseDelta = 0
   for (const row of adjRows ?? []) {
     const signed = row.direction === 'add' ? row.amount : -row.amount
     if (row.type === 'income') incomeDelta += signed
-    else expenseDelta += signed
+    else if (row.type === 'expense') expenseDelta += signed
   }
 
   const totalIncome = baseIncome + incomeDelta
