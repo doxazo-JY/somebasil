@@ -27,3 +27,11 @@ export async function getIncludeOwnerPersonal(): Promise<boolean> {
   const val = await getSetting<boolean>('include_owner_personal')
   return val === true
 }
+
+// 순이익 계산 기준 — 'pos' (POS 매출 기준, 기본) | 'bank' (통장 입금 기준)
+// 매출/통장 입금 카드 자체는 영향 X — 순이익/이익률만 swap
+export type IncomeBasis = 'pos' | 'bank'
+export async function getIncomeBasis(): Promise<IncomeBasis> {
+  const val = await getSetting<IncomeBasis>('income_basis')
+  return val === 'bank' ? 'bank' : 'pos'
+}

@@ -9,6 +9,8 @@ import {
   getWeekDetail,
   getRecentWeekOptions,
 } from '@/lib/supabase/queries/weekly'
+import { getBankIncomeForRange } from '@/lib/supabase/queries/bank-income'
+import { getIncomeBasis } from '@/lib/supabase/queries/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -96,6 +98,19 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
 
   const prevDetail = await getWeekDetail(prevRange.start, cappedPrevEnd)
 
+  const [bankIncome, prevBankIncome, basis] = await Promise.all([
+    getBankIncomeForRange(targetWeekOption.weekStart, targetWeekOption.weekEnd),
+    getBankIncomeForRange(prevRange.start, cappedPrevEnd),
+    getIncomeBasis(),
+  ])
+  const isBank = basis === 'bank'
+
+  // 토글 기준에 따른 effective income/profit
+  const effIncome = isBank ? bankIncome : detail.income
+  const effProfit = effIncome - detail.expense
+  const effPrevIncome = isBank ? prevBankIncome : prevDetail.income
+  const effPrevProfit = effPrevIncome - prevDetail.expense
+
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
@@ -119,16 +134,16 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
         <WeeklyInsightBanner
           weekStart={detail.weekStart}
           weekEnd={detail.weekEnd}
-          income={detail.income}
+          income={effIncome}
           expense={detail.expense}
-          profit={detail.profit}
+          profit={effProfit}
           hasExpenseData={detail.hasExpenseData}
           isPartial={isPartial}
           daysCount={detail.daily.filter((d) => d.income > 0 || d.orderCount > 0).length}
           prev={{
-            income: prevDetail.income,
+            income: effPrevIncome,
             expense: prevDetail.expense,
-            profit: prevDetail.profit,
+            profit: effPrevProfit,
             aov: prevDetail.aov,
             orderCount: prevDetail.orderCount,
             hasExpenseData: prevDetail.hasExpenseData,
@@ -144,8 +159,10 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
       <div className="mb-4">
         <WeeklyKPICards
           income={detail.income}
+          bankIncome={bankIncome}
           expense={detail.expense}
-          profit={detail.profit}
+          profit={effProfit}
+          profitLabel={isBank ? '손익 (통장)' : '손익'}
           aov={detail.aov}
           orderCount={detail.orderCount}
           hasExpenseData={detail.hasExpenseData}
@@ -154,8 +171,9 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
           isPartial={isPartial}
           prev={{
             income: prevDetail.income,
+            bankIncome: prevBankIncome,
             expense: prevDetail.expense,
-            profit: prevDetail.profit,
+            profit: effPrevProfit,
             aov: prevDetail.aov,
             orderCount: prevDetail.orderCount,
             hasExpenseData: prevDetail.hasExpenseData,

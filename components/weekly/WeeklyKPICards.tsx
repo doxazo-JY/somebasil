@@ -49,8 +49,10 @@ function ComparisonCard({
 
 interface Props {
   income: number
+  bankIncome: number
   expense: number
   profit: number
+  profitLabel?: string
   aov: number
   orderCount: number
   hasExpenseData: boolean
@@ -58,6 +60,7 @@ interface Props {
   weekEnd: string
   prev?: {
     income: number
+    bankIncome: number
     expense: number
     profit: number
     aov: number
@@ -69,8 +72,10 @@ interface Props {
 
 export default function WeeklyKPICards({
   income,
+  bankIncome,
   expense,
   profit,
+  profitLabel,
   aov,
   orderCount,
   hasExpenseData,
@@ -80,12 +85,23 @@ export default function WeeklyKPICards({
   return (
     <>
       {/* 부분주 안내는 WeeklyInsightBanner로 끌어올렸음 */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <ComparisonCard
           label="매출"
           current={income > 0 ? fmt(income) : '—'}
           prev={prev ? fmt(prev.income) : '—'}
           formatter={{ change: prev ? calcChange(income, prev.income) : undefined }}
+        />
+        <ComparisonCard
+          label="통장 입금"
+          current={bankIncome > 0 ? fmt(bankIncome) : '—'}
+          prev={prev && prev.bankIncome > 0 ? fmt(prev.bankIncome) : '—'}
+          formatter={{
+            change:
+              prev && prev.bankIncome > 0 && bankIncome > 0
+                ? calcChange(bankIncome, prev.bankIncome)
+                : undefined,
+          }}
         />
         <ComparisonCard
           label="지출"
@@ -100,7 +116,7 @@ export default function WeeklyKPICards({
           highlight="negative"
         />
         <ComparisonCard
-          label="손익"
+          label={profitLabel ?? '손익'}
           current={hasExpenseData ? fmt(profit) : '—'}
           prev={prev?.hasExpenseData ? fmt(prev.profit) : '—'}
           highlight={profit >= 0 ? 'positive' : 'negative'}

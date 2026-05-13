@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { IncomeBasis } from '@/lib/supabase/queries/settings'
 
 interface MonthData {
   month: number
@@ -16,6 +17,10 @@ interface MonthlyBreakdownTableProps {
   memos?: Record<number, string>
   /** 월별 추정 자재비 (메뉴 원가 데이터 기반) — 비어있으면 컬럼 숨김 */
   materialByMonth?: Map<number, number>
+  /** 월별 통장 입금 — 항상 표시 (— 포함) */
+  bankIncomeByMonth?: Record<number, number>
+  /** 순이익 계산 기준 — 'bank'이면 순이익/이익률을 통장 기준으로 */
+  basis?: IncomeBasis
 }
 
 function fmt(v: number) {
@@ -33,14 +38,25 @@ export default function MonthlyBreakdownTable({
   year,
   memos,
   materialByMonth,
+  bankIncomeByMonth,
+  basis = 'pos',
 }: MonthlyBreakdownTableProps) {
+  const isBank = basis === 'bank'
+
   const rows = data
     .filter((d) => d.income > 0 || d.total_expense > 0)
     .sort((a, b) => a.month - b.month)
 
   const totIncome = rows.reduce((s, r) => s + r.income, 0)
   const totExpense = rows.reduce((s, r) => s + r.total_expense, 0)
-  const totProfit = rows.reduce((s, r) => s + r.profit, 0)
+
+  // 이익/이익률은 basis에 따라 달라짐
+  const profitOf = (r: MonthData) =>
+    isBank ? (bankIncomeByMonth?.[r.month] ?? 0) - r.total_expense : r.profit
+  const incomeForMarginOf = (r: MonthData) =>
+    isBank ? bankIncomeByMonth?.[r.month] ?? 0 : r.income
+  const totProfit = rows.reduce((s, r) => s + profitOf(r), 0)
+  const totIncomeForMargin = rows.reduce((s, r) => s + incomeForMarginOf(r), 0)
 
   // 자재비 컬럼 표시 여부 — 데이터 1개라도 있으면 표시
   const showMaterial =
@@ -48,6 +64,12 @@ export default function MonthlyBreakdownTable({
     [...materialByMonth.values()].some((v) => v > 0)
   const totMaterial = showMaterial
     ? rows.reduce((s, r) => s + (materialByMonth!.get(r.month) ?? 0), 0)
+    : 0
+
+  // 통장 입금 컬럼 — bankIncomeByMonth prop 넘어오면 항상 표시 (데이터 0이어도 — 로)
+  const showBankIncome = bankIncomeByMonth != null
+  const totBankIncome = showBankIncome
+    ? rows.reduce((s, r) => s + (bankIncomeByMonth![r.month] ?? 0), 0)
     : 0
 
   return (
@@ -60,9 +82,10 @@ export default function MonthlyBreakdownTable({
           <tr className="bg-gray-50 text-gray-400 font-medium">
             <th className="text-left px-6 py-2.5">월</th>
             <th className="text-right px-4 py-2.5">매출</th>
+            {showBankIncome && <th className="text-right px-4 py-2.5">통장 입금</th>}
             {showMaterial && <th className="text-right px-4 py-2.5">자재비</th>}
             <th className="text-right px-4 py-2.5">지출</th>
-            <th className="text-right px-4 py-2.5">순이익</th>
+            <th className="text-right px-4 py-2.5">순이익{isBank ? ' (통장)' : ''}</th>
             <th className="text-right px-4 py-2.5">이익률</th>
           </tr>
         </thead>
@@ -71,6 +94,7 @@ export default function MonthlyBreakdownTable({
             const isSelected = r.month === selectedMonth
             const memo = memos?.[r.month]
             const material = materialByMonth?.get(r.month) ?? 0
+            const bank = bankIncomeByMonth?.[r.month] ?? 0
             return (
               <tr
                 key={r.month}
@@ -92,6 +116,11 @@ export default function MonthlyBreakdownTable({
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-right text-gray-600 align-top">{fmt(r.income)}</td>
+                {showBankIncome && (
+                  <td className="px-4 py-2.5 text-right text-gray-500 align-top">
+                    {bank > 0 ? fmt(bank) : '—'}
+                  </td>
+                )}
                 {showMaterial && (
                   <td className="px-4 py-2.5 text-right text-gray-500 align-top">
                     {material > 0 ? fmt(material) : '—'}
@@ -103,16 +132,24 @@ export default function MonthlyBreakdownTable({
                   </td>
                 )}
                 <td className="px-4 py-2.5 text-right text-gray-600 align-top">{fmt(r.total_expense)}</td>
-                <td className={`px-4 py-2.5 text-right font-semibold align-top ${
-                  r.profit >= 0 ? 'text-[#1a5c3a]' : 'text-red-500'
-                }`}>
-                  {fmt(r.profit)}
-                </td>
-                <td className={`px-4 py-2.5 text-right align-top ${
-                  r.profit >= 0 ? 'text-[#1a5c3a]' : 'text-red-400'
-                }`}>
-                  {margin(r.profit, r.income)}
-                </td>
+                {(() => {
+                  const p = profitOf(r)
+                  const inc = incomeForMarginOf(r)
+                  return (
+                    <>
+                      <td className={`px-4 py-2.5 text-right font-semibold align-top ${
+                        p >= 0 ? 'text-[#1a5c3a]' : 'text-red-500'
+                      }`}>
+                        {fmt(p)}
+                      </td>
+                      <td className={`px-4 py-2.5 text-right align-top ${
+                        p >= 0 ? 'text-[#1a5c3a]' : 'text-red-400'
+                      }`}>
+                        {margin(p, inc)}
+                      </td>
+                    </>
+                  )
+                })()}
               </tr>
             )
           })}
@@ -121,6 +158,11 @@ export default function MonthlyBreakdownTable({
           <tr className="bg-gray-50 border-t border-gray-100 font-semibold">
             <td className="px-6 py-2.5 text-gray-500">합계</td>
             <td className="px-4 py-2.5 text-right text-gray-700">{fmt(totIncome)}</td>
+            {showBankIncome && (
+              <td className="px-4 py-2.5 text-right text-gray-700">
+                {totBankIncome > 0 ? fmt(totBankIncome) : '—'}
+              </td>
+            )}
             {showMaterial && (
               <td className="px-4 py-2.5 text-right text-gray-700">
                 {totMaterial > 0 ? fmt(totMaterial) : '—'}
@@ -131,7 +173,7 @@ export default function MonthlyBreakdownTable({
               {fmt(totProfit)}
             </td>
             <td className={`px-4 py-2.5 text-right ${totProfit >= 0 ? 'text-[#1a5c3a]' : 'text-red-400'}`}>
-              {margin(totProfit, totIncome)}
+              {margin(totProfit, totIncomeForMargin)}
             </td>
           </tr>
         </tfoot>

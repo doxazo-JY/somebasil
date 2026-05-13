@@ -22,6 +22,12 @@ import {
   getDailySales,
   getSalesTotalForDate,
 } from '@/lib/supabase/queries/income'
+import {
+  getMonthlyBankIncome,
+  getAllTimeBankIncome,
+  getYearlyBankIncomeByMonth,
+} from '@/lib/supabase/queries/bank-income'
+import { getIncomeBasis } from '@/lib/supabase/queries/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,6 +81,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     dailySales,
     yesterdayIncome,
     prevWeekSameDayIncome,
+    bankIncome,
+    prevBankIncome,
+    cumBankIncome,
   ] = await Promise.all([
     getMonthlySummary(year, month),
     getMonthlySummary(prevYear, prevMonth),
@@ -92,11 +101,39 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     getDailySales(year, month),
     getSalesTotalForDate(kstDateOffset(1)),
     getSalesTotalForDate(kstDateOffset(8)),
+    getMonthlyBankIncome(year, month),
+    getMonthlyBankIncome(prevYear, prevMonth),
+    getAllTimeBankIncome(),
   ])
 
-  const cumIncome = allTime.reduce((s, d) => s + d.income, 0)
+  // 순이익 기준 — POS 매출 vs 통장 입금 (관리>설정에서 토글)
+  const basis = await getIncomeBasis()
+  const isBank = basis === 'bank'
+  const bankByMonth = isBank ? await getYearlyBankIncomeByMonth(year) : {}
+
+  const posCumIncome = allTime.reduce((s, d) => s + d.income, 0)
   const cumExpense = allTime.reduce((s, d) => s + d.total_expense, 0)
-  const cumProfit = allTime.reduce((s, d) => s + d.profit, 0)
+  const cumIncome = isBank ? cumBankIncome : posCumIncome
+  const cumProfit = isBank
+    ? cumBankIncome - cumExpense
+    : allTime.reduce((s, d) => s + d.profit, 0)
+
+  // 토글 기준에 따라 "이익" 계산에 쓰이는 effective income/profit
+  const effIncome = isBank ? bankIncome : current?.income ?? 0
+  const effPrevIncome = isBank ? prevBankIncome : prev?.income ?? 0
+  const effExpense = current?.total_expense ?? 0
+  const effPrevExpense = prev?.total_expense ?? 0
+  const effProfit = effIncome - effExpense
+  const effPrevProfit = effPrevIncome - effPrevExpense
+
+  // TrendChart용 — 토글 따라 yearlySummary income/profit swap
+  const trendData = isBank
+    ? yearlySummary.map((r) => ({
+        ...r,
+        income: bankByMonth[r.month] ?? 0,
+        profit: (bankByMonth[r.month] ?? 0) - r.total_expense,
+      }))
+    : yearlySummary
 
   const aovChange = calcChange(aovData.aov, prevAovData.aov)
 
@@ -121,10 +158,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         <InsightBanner
           year={year}
           month={month}
-          income={current?.income ?? 0}
-          expense={current?.total_expense ?? 0}
-          profit={current?.profit ?? 0}
-          prevIncome={prev?.income ?? 0}
+          income={effIncome}
+          expense={effExpense}
+          profit={effProfit}
+          prevIncome={effPrevIncome}
           laborCurr={expenses.labor ?? 0}
           laborPrev={prevExpenses.labor ?? 0}
           ingredientsCurr={ingredientsCurr}
@@ -143,6 +180,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           매출 <strong className="text-gray-800">{formatManwon(cumIncome)}</strong>
         </span>
         <span>
+          통장 입금 <strong className="text-gray-800">{formatManwon(cumBankIncome)}</strong>
+        </span>
+        <span>
           지출 <strong className="text-gray-800">{formatManwon(cumExpense)}</strong>
         </span>
         <span>
@@ -157,7 +197,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
         {month}월 현황
       </p>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
         <StatCard
           label="월 매출"
           value={current ? formatManwon(current.income) : '—'}
@@ -165,6 +205,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           yoyChange={current && lastYearSame ? calcChange(current.income, lastYearSame.income) : undefined}
           subLabel="전월比"
           href={`/menu?year=${year}&month=${month}`}
+        />
+        <StatCard
+          label="통장 입금"
+          value={bankIncome > 0 ? formatManwon(bankIncome) : '—'}
+          change={bankIncome > 0 && prevBankIncome > 0 ? calcChange(bankIncome, prevBankIncome) : undefined}
+          subLabel="전월比"
         />
         <StatCard
           label="월 지출"
@@ -176,12 +222,16 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           href={`/expenses?year=${year}&month=${month}`}
         />
         <StatCard
-          label="순이익"
-          value={current ? formatManwon(current.profit) : '—'}
-          change={current && prev ? calcChange(current.profit, prev.profit) : undefined}
-          yoyChange={current && lastYearSame ? calcChange(current.profit, lastYearSame.profit) : undefined}
+          label={isBank ? '순이익 (통장)' : '순이익'}
+          value={current ? formatManwon(effProfit) : '—'}
+          change={current && prev ? calcChange(effProfit, effPrevProfit) : undefined}
+          yoyChange={
+            !isBank && current && lastYearSame
+              ? calcChange(current.profit, lastYearSame.profit)
+              : undefined
+          }
           subLabel="전월比"
-          highlight={current && current.profit >= 0 ? 'positive' : 'negative'}
+          highlight={effProfit >= 0 ? 'positive' : 'negative'}
           href={`/profit?year=${year}`}
         />
         <StatCard
@@ -204,11 +254,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       {/* 적자 원인 신호 — 전월 대비 비율 변화 */}
       <div className="mb-6">
         <DeficitSignals
-          income={current?.income ?? 0}
+          income={effIncome}
           laborCurr={expenses.labor ?? 0}
           ingredientsCurr={ingredientsCurr}
           fixedCurr={expenses.fixed ?? 0}
-          prevIncome={prev?.income ?? 0}
+          prevIncome={effPrevIncome}
           laborPrev={prevExpenses.labor ?? 0}
           ingredientsPrev={ingredientsPrev}
           fixedPrev={prevExpenses.fixed ?? 0}
@@ -239,7 +289,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
       {/* 12개월 트렌드 — 역사적 맥락 */}
       <div>
-        <TrendChart data={yearlySummary} />
+        <TrendChart data={trendData} />
       </div>
     </div>
   )

@@ -19,6 +19,8 @@ interface ProfitStatCardsProps {
   monthsWithData: number
   /** YTD 추정 자재비 (메뉴 원가 데이터 기반) — 0이면 카드 안 표시 */
   ytdMaterialCost?: number
+  /** 통장 기준일 때 라벨에 표시 */
+  isBank?: boolean
 }
 
 export default function ProfitStatCards({
@@ -27,6 +29,7 @@ export default function ProfitStatCards({
   ytdProfit,
   monthsWithData,
   ytdMaterialCost,
+  isBank,
 }: ProfitStatCardsProps) {
   const margin = profitMargin(ytdProfit, ytdIncome)
   const avgProfit = monthsWithData > 0 ? ytdProfit / monthsWithData : 0
@@ -39,15 +42,15 @@ export default function ProfitStatCards({
   return (
     <>
       <StatCard
-        label="YTD 누적 순이익"
+        label={isBank ? 'YTD 누적 순이익 (통장)' : 'YTD 누적 순이익'}
         value={hasData ? formatManwon(ytdProfit) : '—'}
         subLabel={monthsWithData > 0 ? `월평균 ${formatManwon(avgProfit)}` : undefined}
         highlight={ytdProfit >= 0 ? 'positive' : 'negative'}
       />
       <StatCard
-        label="YTD 이익률"
+        label={isBank ? 'YTD 이익률 (통장)' : 'YTD 이익률'}
         value={margin}
-        subLabel="순이익 / 매출"
+        subLabel={isBank ? '순이익 / 통장 입금' : '순이익 / 매출'}
         highlight={ytdProfit >= 0 ? 'positive' : 'negative'}
       />
       {hasMaterial ? (

@@ -7,6 +7,8 @@ import BreakEvenSection from '@/components/profit/BreakEvenSection'
 import MarginBreakdown from '@/components/profit/MarginBreakdown'
 import { getYearlySummary, getMemosForYear } from '@/lib/supabase/queries/dashboard'
 import { getYearlyMaterialMetrics } from '@/lib/supabase/queries/material-cost'
+import { getYearlyBankIncomeByMonth } from '@/lib/supabase/queries/bank-income'
+import { getIncomeBasis } from '@/lib/supabase/queries/settings'
 
 // 마진 분해 표시 임계값 — 등록 메뉴 매출 비중이 이 값 이상이어야 신뢰
 // 80% = 메인 메뉴 거의 다 등록. 미만이면 등록 안 된 메뉴 자재비가 빠져서 과소평가
@@ -28,19 +30,28 @@ export default async function ProfitPage({ searchParams }: PageProps) {
   const now = new Date()
   const year = Number(params.year ?? now.getFullYear())
 
-  const [yearlySummary, memos, materialMetricsByMonth] = await Promise.all([
+  const [yearlySummary, memos, materialMetricsByMonth, bankIncomeByMonth, basis] = await Promise.all([
     getYearlySummary(year),
     getMemosForYear(year),
     getYearlyMaterialMetrics(year),
+    getYearlyBankIncomeByMonth(year),
+    getIncomeBasis(),
   ])
+  const isBank = basis === 'bank'
 
   // YTD 누적
-  const ytdIncome = yearlySummary.reduce((s, d) => s + d.income, 0)
+  const posYtdIncome = yearlySummary.reduce((s, d) => s + d.income, 0)
   const ytdExpense = yearlySummary.reduce((s, d) => s + d.total_expense, 0)
-  const ytdProfit = yearlySummary.reduce((s, d) => s + d.profit, 0)
+  const posYtdProfit = yearlySummary.reduce((s, d) => s + d.profit, 0)
+  const ytdBankIncome = Object.values(bankIncomeByMonth).reduce((s, v) => s + v, 0)
+
+  // 토글 기준에 따른 effective values (ProfitStatCards / BreakEven / 누적바 이익률용)
+  const ytdIncome = isBank ? ytdBankIncome : posYtdIncome
+  const ytdProfit = isBank ? ytdBankIncome - ytdExpense : posYtdProfit
   const ytdMaterial = [...materialMetricsByMonth.values()].reduce((s, m) => s + m.material, 0)
   const ytdOkSales = [...materialMetricsByMonth.values()].reduce((s, m) => s + m.okSales, 0)
-  const okSalesRatio = ytdIncome > 0 ? ytdOkSales / ytdIncome : 0
+  // 등록 메뉴 매출 비중은 POS 기준으로 계산 (메뉴원가 데이터 자체가 POS 매출과 매칭)
+  const okSalesRatio = posYtdIncome > 0 ? ytdOkSales / posYtdIncome : 0
   const isReliable = okSalesRatio >= MATERIAL_RELIABLE_THRESHOLD
 
   // material 컬럼/카드/분해 표시는 등록률 50%+ 일 때만
@@ -80,6 +91,7 @@ export default async function ProfitPage({ searchParams }: PageProps) {
           ytdProfit={ytdProfit}
           monthsWithData={monthsWithData}
           ytdMaterialCost={isReliable ? ytdMaterial : undefined}
+          isBank={isBank}
         />
         <div className="col-span-2 sm:col-span-3 lg:col-span-3">
           <BreakEvenSection
@@ -95,14 +107,17 @@ export default async function ProfitPage({ searchParams }: PageProps) {
       <div className="bg-gray-50 rounded-xl border border-gray-100 px-6 py-3 mb-4 flex flex-wrap gap-4 sm:gap-8 text-sm">
         <span className="text-gray-400">{year}년 누적 ({monthsWithData}개월)</span>
         <span>
-          매출 <strong className="text-gray-800">{formatManwon(ytdIncome)}</strong>
+          매출 <strong className="text-gray-800">{formatManwon(posYtdIncome)}</strong>
+        </span>
+        <span>
+          통장 입금 <strong className="text-gray-800">{formatManwon(ytdBankIncome)}</strong>
         </span>
         {isReliable && ytdMaterial > 0 && (
           <span>
             자재비{' '}
             <strong className="text-gray-800">{formatManwon(ytdMaterial)}</strong>
             <span className="text-gray-400 ml-1 text-xs">
-              ({((ytdMaterial / ytdIncome) * 100).toFixed(1)}%)
+              ({((ytdMaterial / posYtdIncome) * 100).toFixed(1)}%)
             </span>
           </span>
         )}
@@ -110,7 +125,7 @@ export default async function ProfitPage({ searchParams }: PageProps) {
           지출 <strong className="text-gray-800">{formatManwon(ytdExpense)}</strong>
         </span>
         <span>
-          이익{' '}
+          이익{isBank ? ' (통장)' : ''}{' '}
           <strong className={ytdProfit >= 0 ? 'text-[#1a5c3a]' : 'text-red-500'}>
             {formatManwon(ytdProfit)}
           </strong>
@@ -122,11 +137,11 @@ export default async function ProfitPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      {/* 마진 분해 — 매출에서 자재비 빼고 남는 돈 흐름 */}
-      {ytdIncome > 0 && (
+      {/* 마진 분해 — 매출에서 자재비 빼고 남는 돈 흐름 (자재비가 POS 매출 기준이라 POS 기준 유지) */}
+      {posYtdIncome > 0 && (
         isReliable ? (
           <MarginBreakdown
-            income={ytdIncome}
+            income={posYtdIncome}
             material={ytdMaterial}
             totalExpense={ytdExpense}
             okSalesRatio={okSalesRatio}
@@ -145,12 +160,24 @@ export default async function ProfitPage({ searchParams }: PageProps) {
 
       {/* 수입·지출·이익 추이 + 월별 손익 테이블 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <ProfitTrendChart data={yearlySummary} />
+        <ProfitTrendChart
+          data={
+            isBank
+              ? yearlySummary.map((r) => ({
+                  ...r,
+                  income: bankIncomeByMonth[r.month] ?? 0,
+                  profit: (bankIncomeByMonth[r.month] ?? 0) - r.total_expense,
+                }))
+              : yearlySummary
+          }
+        />
         <MonthlyBreakdownTable
           data={yearlySummary}
           year={year}
           memos={memos}
           materialByMonth={materialByMonth}
+          bankIncomeByMonth={bankIncomeByMonth}
+          basis={basis}
         />
       </div>
     </div>

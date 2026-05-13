@@ -45,8 +45,27 @@ export async function POST(req: NextRequest) {
   if (type === 'bank_transaction') {
     const bankRows = rows as BankRow[]
 
-    // 수입 = POS only 원칙: 통장 입금은 DB에 저장하지 않음
-    // (대여금/개인이체/선불충전 등이 섞여있고, 카드사 입금은 POS와 중복)
+    // 통장 입금 → bank_income upsert
+    // POS '매출'과 별개의 지표 — 카드 정산 지연·선불카드 차감 때문에 둘이 갈림 (의도된 갭)
+    const incomeRows = bankRows.filter((r) => r.type === 'income')
+    const incomeInserts = incomeRows.map((row) => ({
+      date: row.date,
+      tx_time: row.tx_time,
+      balance_after: row.balance_after,
+      memo: row.memo,
+      counterpart: row.counterpart,
+      amount: row.income ?? 0,
+    }))
+    if (incomeInserts.length > 0) {
+      const CHUNK = 500
+      for (let i = 0; i < incomeInserts.length; i += CHUNK) {
+        const chunk = incomeInserts.slice(i, i + CHUNK)
+        const { error } = await supabase
+          .from('bank_income')
+          .upsert(chunk, { onConflict: 'tx_time,balance_after' })
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    }
 
     // 지출 항목 → monthly_expenses upsert (tx_time + balance_after로 중복 방지)
     const expenseRows = bankRows.filter((r) => r.type === 'expense')
