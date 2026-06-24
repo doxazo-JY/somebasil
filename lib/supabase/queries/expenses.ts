@@ -145,19 +145,19 @@ export async function getMonthlyExpenseItems(year: number, month: number) {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('monthly_expenses')
-    .select('id, category, item, amount')
+    .select('id, category, item, amount, date')
     .eq('year', year)
     .eq('month', month)
     .neq('category', 'excluded')
-    .order('amount', { ascending: false })
+    .order('date', { ascending: true })
 
   if (error) throw error
 
   // 카테고리별로 그룹핑
-  const grouped: Record<string, { id: string; item: string; amount: number }[]> = {}
+  const grouped: Record<string, { id: string; item: string; amount: number; date?: string }[]> = {}
   for (const row of data ?? []) {
     if (!grouped[row.category]) grouped[row.category] = []
-    grouped[row.category].push({ id: row.id, item: row.item, amount: row.amount })
+    grouped[row.category].push({ id: row.id, item: row.item, amount: row.amount, date: row.date })
   }
 
   return grouped

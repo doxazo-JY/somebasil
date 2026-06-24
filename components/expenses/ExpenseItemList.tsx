@@ -18,6 +18,7 @@ interface ExpenseItem {
   id: string
   item: string
   amount: number
+  date?: string
 }
 
 interface ExpenseItemListProps {
@@ -51,7 +52,14 @@ export default function ExpenseItemList({ data }: ExpenseItemListProps) {
               <ul className="divide-y divide-gray-50 max-h-48 overflow-y-auto">
                 {items.map((item) => (
                   <li key={item.id} className="flex items-center px-5 py-2.5 gap-3">
-                    <span className="text-xs text-gray-600 flex-1 truncate">{item.item || '—'}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs text-gray-600 block truncate">{item.item || '—'}</span>
+                      {item.date && (
+                        <span className="text-[10px] text-gray-400">
+                          {item.date.slice(5).replace('-', '/')}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs font-medium text-gray-700 shrink-0">
                       {item.amount.toLocaleString()}원
                     </span>
