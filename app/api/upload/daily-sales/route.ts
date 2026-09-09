@@ -9,7 +9,7 @@ export interface DailySalesRow {
   product_name: string
   category: string
   quantity: number
-  amount: number          // 합계 (할인 전)
+  amount: number          // 판매 금액 (할인 반영 후 실매출)
   order_time: string      // ISO 8601 타임스탬프
 }
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false })
 
-  // 컬럼: 4=판매번호 | 5=No | 8=상품명 | 9=상태 | 11=주문시간 | 13=수량 | 15=합계
+  // 컬럼: 4=판매번호 | 5=No | 8=상품명 | 9=상태 | 11=주문시간 | 13=수량 | 18=판매 금액(할인 반영 후)
   const result: DailySalesRow[] = []
 
   for (let i = 1; i < rows.length; i++) {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     const parsed = parseOrderTime(r[11])
     if (!parsed) continue
 
-    const amount = Number(String(r[15] ?? '').replace(/,/g, ''))
+    const amount = Number(String(r[18] ?? '').replace(/,/g, ''))
     if (isNaN(amount) || amount === 0) continue
 
     const quantity = Number(String(r[13] ?? '').replace(/,/g, '')) || 0
