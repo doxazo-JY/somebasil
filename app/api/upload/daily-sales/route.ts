@@ -51,6 +51,34 @@ function parseOrderTime(raw: unknown): { date: string; iso: string } | null {
   return { date, iso }
 }
 
+// POS 엑셀 헤더명 → 컬럼 인덱스. 열 순서가 바뀌어도 안 깨지도록 이름으로 찾는다.
+const REQUIRED_COLUMNS = {
+  orderId: '판매번호',
+  lineNo: 'No',
+  productName: '상품명',
+  status: '상태',
+  orderTime: '주문 시간',
+  quantity: '수량',
+  amount: '판매 금액',
+} as const
+
+function resolveColumnIndexes(headerRow: unknown[]): Record<keyof typeof REQUIRED_COLUMNS, number> {
+  const indexes = {} as Record<keyof typeof REQUIRED_COLUMNS, number>
+  const missing: string[] = []
+
+  for (const [key, headerName] of Object.entries(REQUIRED_COLUMNS)) {
+    const idx = headerRow.findIndex((h) => String(h ?? '').trim() === headerName)
+    if (idx === -1) missing.push(headerName)
+    indexes[key as keyof typeof REQUIRED_COLUMNS] = idx
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`POS 엑셀에서 다음 컬럼을 찾을 수 없습니다: ${missing.join(', ')}`)
+  }
+
+  return indexes
+}
+
 export async function POST(req: NextRequest) {
   const formData = await req.formData()
   const file = formData.get('file') as File | null
@@ -64,28 +92,38 @@ export async function POST(req: NextRequest) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false })
 
-  // 컬럼: 4=판매번호 | 5=No | 8=상품명 | 9=상태 | 11=주문시간 | 13=수량 | 18=판매 금액(할인 반영 후)
+  if (rows.length === 0) {
+    return NextResponse.json({ error: '엑셀에 데이터가 없습니다.' }, { status: 400 })
+  }
+
+  let col: Record<keyof typeof REQUIRED_COLUMNS, number>
+  try {
+    col = resolveColumnIndexes(rows[0] as unknown[])
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 })
+  }
+
   const result: DailySalesRow[] = []
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i]
     if (!r || !Array.isArray(r)) continue
 
-    const productName = r[8]
-    const status = r[9]
+    const productName = r[col.productName]
+    const status = r[col.status]
     if (!productName || typeof productName !== 'string') continue
     // 취소만 제외 (반품은 음수로 저장되어 있어 그대로 반영 → 총액에서 자동 차감)
     if (status === '취소') continue
 
-    const parsed = parseOrderTime(r[11])
+    const parsed = parseOrderTime(r[col.orderTime])
     if (!parsed) continue
 
-    const amount = Number(String(r[18] ?? '').replace(/,/g, ''))
+    const amount = Number(String(r[col.amount] ?? '').replace(/,/g, ''))
     if (isNaN(amount) || amount === 0) continue
 
-    const quantity = Number(String(r[13] ?? '').replace(/,/g, '')) || 0
-    const orderId = String(r[4] ?? '').trim()
-    const lineNo = Number(r[5]) || 0
+    const quantity = Number(String(r[col.quantity] ?? '').replace(/,/g, '')) || 0
+    const orderId = String(r[col.orderId] ?? '').trim()
+    const lineNo = Number(r[col.lineNo]) || 0
 
     result.push({
       date: parsed.date,
