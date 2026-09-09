@@ -62,6 +62,46 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
   const [filename, setFilename] = useState('')
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
+  // 일별 매출 탭: 여러 파일을 순차 파싱해서 하나의 미리보기로 합침
+  async function handleFiles(files: File[]) {
+    setLoading(true)
+    setPreview(null)
+    setRecipeStats(null)
+    setMessage(null)
+
+    const mergedRows: DailySalesRow[] = []
+    const errors: string[] = []
+
+    for (const file of files) {
+      const formData = new FormData()
+      formData.append('file', file)
+      try {
+        const res = await fetch('/api/upload/daily-sales', { method: 'POST', body: formData })
+        const json = await safeJson(res)
+        if (!res.ok) {
+          errors.push(`${file.name}: ${json?.error ?? `파싱 실패 (${res.status})`}`)
+          continue
+        }
+        mergedRows.push(...(json.rows as DailySalesRow[]))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '알 수 없는 오류'
+        errors.push(`${file.name}: ${msg}`)
+      }
+    }
+
+    setLoading(false)
+    setFilename(files.length === 1 ? files[0].name : `${files.length}개 파일`)
+
+    if (mergedRows.length > 0) {
+      setPreview({ type: 'daily', rows: mergedRows })
+    }
+    if (errors.length > 0) {
+      setMessage({ text: `일부 파일 처리 실패:\n${errors.join('\n')}`, ok: false })
+    } else {
+      setMessage({ text: `${files.length}개 파일 파싱 완료`, ok: true })
+    }
+  }
+
   async function handleFile(file: File) {
     setLoading(true)
     setPreview(null)
@@ -234,7 +274,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
         accept=".xlsx,.xls"
         hint={
           tab === 'daily'
-            ? 'POS 일일매출 엑셀 파일 (기간·단일 모두 가능)'
+            ? 'POS 일일매출 엑셀 파일 (여러 개 동시 선택 가능)'
             : tab === 'bank'
               ? '하나은행 거래내역 엑셀 파일'
               : tab === 'menu'
@@ -242,12 +282,13 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
                 : '레시피 템플릿 엑셀 v5 (4시트: 재료·서브레시피·레시피·포장세트). 부분 입력 OK'
         }
         onFile={handleFile}
+        onFiles={tab === 'daily' ? handleFiles : undefined}
         loading={loading}
       />
 
       {/* 메시지 */}
       {message && (
-        <p className={`text-sm ${message.ok ? 'text-[#1a5c3a]' : 'text-red-500'}`}>
+        <p className={`text-sm whitespace-pre-line ${message.ok ? 'text-[#1a5c3a]' : 'text-red-500'}`}>
           {message.text}
         </p>
       )}

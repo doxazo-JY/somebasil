@@ -4,6 +4,8 @@ interface FileDropZoneProps {
   accept: string
   hint: string
   onFile: (file: File) => void
+  /** 지정 시 여러 파일 선택/드롭 허용 — 선택된 전체 파일 목록을 한 번에 전달 */
+  onFiles?: (files: File[]) => void
   loading?: boolean
 }
 
@@ -20,19 +22,30 @@ function augmentAccept(accept: string): string {
   return tokens.join(',')
 }
 
-export default function FileDropZone({ accept, hint, onFile, loading }: FileDropZoneProps) {
+export default function FileDropZone({ accept, hint, onFile, onFiles, loading }: FileDropZoneProps) {
   const acceptWithMime = augmentAccept(accept)
+  const isMultiple = !!onFiles
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     if (loading) return
-    const file = e.dataTransfer.files[0]
-    if (file) onFile(file)
+    if (isMultiple) {
+      const files = Array.from(e.dataTransfer.files)
+      if (files.length > 0) onFiles!(files)
+    } else {
+      const file = e.dataTransfer.files[0]
+      if (file) onFile(file)
+    }
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) onFile(file)
+    if (isMultiple) {
+      const files = Array.from(e.target.files ?? [])
+      if (files.length > 0) onFiles!(files)
+    } else {
+      const file = e.target.files?.[0]
+      if (file) onFile(file)
+    }
     // 같은 파일 재선택 가능하도록 초기화
     e.target.value = ''
   }
@@ -50,6 +63,7 @@ export default function FileDropZone({ accept, hint, onFile, loading }: FileDrop
       <input
         type="file"
         accept={acceptWithMime}
+        multiple={isMultiple}
         className="hidden"
         onChange={handleChange}
         disabled={loading}
