@@ -4,15 +4,35 @@ import { recalcMonthlySummary } from '@/lib/supabase/recalc'
 import type { DailySalesRow } from '../daily-sales/route'
 import type { BankRow } from '../bank/route'
 import type { MenuRow } from '../menu/route'
+import type { WorkShift, WorklogStaff } from '@/lib/worklog-parser'
+import { saveWorklog } from '@/lib/supabase/worklog-save'
 
 export async function POST(req: NextRequest) {
-  const { type, rows, filename } = await req.json() as {
-    type: 'daily_sales' | 'bank_transaction' | 'menu'
+  const { type, rows, filename, worklog } = await req.json() as {
+    type: 'daily_sales' | 'bank_transaction' | 'menu' | 'work_logs'
     rows: (DailySalesRow | BankRow | MenuRow)[]
     filename: string
+    /** type='work_logs' 전용 */
+    worklog?: { shifts: WorkShift[]; staff: WorklogStaff[]; months: string[] }
   }
 
   const supabase = createServerClient()
+
+  if (type === 'work_logs') {
+    if (!worklog) return NextResponse.json({ error: '근무 기록이 없습니다.' }, { status: 400 })
+    try {
+      const result = await saveWorklog(supabase, worklog.shifts, worklog.staff, worklog.months)
+      await supabase.from('upload_history').insert({
+        file_name: filename,
+        file_type: type,
+        status: 'success',
+      })
+      return NextResponse.json({ ok: true, ...result })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message
+      return NextResponse.json({ error: msg ?? '저장 실패' }, { status: 500 })
+    }
+  }
 
   if (type === 'daily_sales') {
     const salesRows = rows as DailySalesRow[]

@@ -5,7 +5,9 @@ import ProfitTargetTable from '@/components/diagnosis/ProfitTargetTable'
 import CustomerAovChart from '@/components/diagnosis/CustomerAovChart'
 import CalcBasisNote from '@/components/diagnosis/CalcBasisNote'
 import UnavailableList from '@/components/diagnosis/UnavailableList'
+import HourlyLaborSection from '@/components/diagnosis/HourlyLaborSection'
 import { getDiagnosisMonths } from '@/lib/supabase/queries/diagnosis'
+import { getHourlyLaborEfficiency } from '@/lib/supabase/queries/labor'
 import { buildBaseline, diagnose, profitTargets } from '@/lib/diagnosis-calc'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +22,10 @@ const TARGETS = [
 ]
 
 export default async function DiagnosisPage() {
-  const months = await getDiagnosisMonths()
+  const [months, hourlyLabor] = await Promise.all([
+    getDiagnosisMonths(),
+    getHourlyLaborEfficiency(BASELINE_MONTHS),
+  ])
   const baseline = buildBaseline(months, BASELINE_MONTHS)
   const result = baseline ? diagnose(baseline) : null
 
@@ -64,6 +69,12 @@ export default async function DiagnosisPage() {
         {trend.length > 0 && <CustomerAovChart data={trend} />}
         {baseline && <CalcBasisNote baseline={baseline} />}
       </div>
+
+      {hourlyLabor && (
+        <div className="mb-4">
+          <HourlyLaborSection data={hourlyLabor} />
+        </div>
+      )}
 
       <UnavailableList />
     </div>

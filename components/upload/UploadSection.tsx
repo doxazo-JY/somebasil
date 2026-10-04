@@ -5,16 +5,19 @@ import { useRouter } from 'next/navigation'
 import FileDropZone from './FileDropZone'
 import PreviewTable, { type PreviewRow } from './PreviewTable'
 import MenuPreviewTable from './MenuPreviewTable'
+import WorklogPreview from './WorklogPreview'
 import type { BankRow } from '@/app/api/upload/bank/route'
 import type { DailySalesRow } from '@/app/api/upload/daily-sales/route'
 import type { MenuRow } from '@/app/api/upload/menu/route'
+import type { WorklogParseResult } from '@/lib/worklog-parser'
 
-type Tab = 'daily' | 'bank' | 'menu' | 'recipe'
+type Tab = 'daily' | 'bank' | 'menu' | 'recipe' | 'worklog'
 
 type DailyPreview = { type: 'daily'; rows: DailySalesRow[] }
 type BankPreview = { type: 'bank'; rows: PreviewRow[]; originals: BankRow[] }
 type MenuPreview = { type: 'menu'; rows: MenuRow[] }
-type PreviewState = DailyPreview | BankPreview | MenuPreview
+type WorklogPreviewState = { type: 'worklog' } & WorklogParseResult
+type PreviewState = DailyPreview | BankPreview | MenuPreview | WorklogPreviewState
 
 interface RecipeUploadStats {
   ingredientCount: number
@@ -130,6 +133,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
         daily: '/api/upload/daily-sales',
         bank: '/api/upload/bank',
         menu: '/api/upload/menu',
+        worklog: '/api/upload/worklog',
       } as const
       const res = await fetch(endpointMap[tab], { method: 'POST', body: formData })
       const json = await safeJson(res)
@@ -152,6 +156,9 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
         })
       } else if (tab === 'menu') {
         setPreview({ type: 'menu', rows: json.rows as MenuRow[] })
+      } else if (tab === 'worklog') {
+        const r = json as WorklogParseResult
+        setPreview({ type: 'worklog', shifts: r.shifts, staff: r.staff, months: r.months, warnings: r.warnings })
       }
     } catch (err) {
       // 네트워크 끊김 / 타임아웃 / JSON 파싱 실패 — 모바일에서 흔함
@@ -177,6 +184,33 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
       setMessage({ text: json.error ?? '저장 실패', ok: false })
     } else {
       setMessage({ text: `저장 완료! ${rows.length}개 메뉴 반영됨.`, ok: true })
+      setPreview(null)
+      router.refresh()
+    }
+  }
+
+  async function handleSaveWorklog(p: WorklogPreviewState) {
+    setSaving(true)
+    setMessage(null)
+    const res = await fetch('/api/upload/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'work_logs',
+        filename,
+        worklog: { shifts: p.shifts, staff: p.staff, months: p.months },
+      }),
+    })
+    const json = await safeJson(res)
+    setSaving(false)
+    if (!res.ok) {
+      setMessage({ text: json?.error ?? `저장 실패 (${res.status})`, ok: false })
+    } else {
+      const created = (json.createdStaff as string[]) ?? []
+      setMessage({
+        text: `저장 완료! 근무 ${json.savedShifts}건${created.length > 0 ? ` · 새 직원 ${created.join(', ')}` : ''}`,
+        ok: true,
+      })
       setPreview(null)
       router.refresh()
     }
@@ -243,9 +277,17 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
     <div className="flex flex-col gap-4">
       {/* 탭 — 모바일은 짧은 라벨, 데스크탑은 풀 라벨 */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit max-w-full">
-        {(['daily', 'bank', 'menu', 'recipe'] as Tab[]).map((t) => {
+        {(['daily', 'bank', 'menu', 'recipe', 'worklog'] as Tab[]).map((t) => {
           const short =
-            t === 'daily' ? '일별' : t === 'bank' ? '통장' : t === 'menu' ? '메뉴' : '레시피'
+            t === 'daily'
+              ? '일별'
+              : t === 'bank'
+                ? '통장'
+                : t === 'menu'
+                  ? '메뉴'
+                  : t === 'recipe'
+                    ? '레시피'
+                    : '근무'
           const full =
             t === 'daily'
               ? '📋 일별 매출'
@@ -253,7 +295,9 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
                 ? '🏦 통장 거래내역'
                 : t === 'menu'
                   ? '🍽️ 메뉴 마스터'
-                  : '🥄 레시피·원가'
+                  : t === 'recipe'
+                    ? '🥄 레시피·원가'
+                    : '🕐 근무일지'
           return (
             <button
               key={t}
@@ -279,7 +323,9 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
               ? '하나은행 거래내역 엑셀 파일'
               : tab === 'menu'
                 ? 'POS 메뉴 마스터 엑셀 (5컬럼: ID·Y/N·명칭·단가)'
-                : '레시피 템플릿 엑셀 v5 (4시트: 재료·서브레시피·레시피·포장세트). 부분 입력 OK'
+                : tab === 'recipe'
+                  ? '레시피 템플릿 엑셀 v5 (4시트: 재료·서브레시피·레시피·포장세트). 부분 입력 OK'
+                  : '알바 근무일지 엑셀 (월별 시트 "26년 8월" 형식, 평일 + 주일 블록)'
         }
         onFile={handleFile}
         onFiles={tab === 'daily' ? handleFiles : undefined}
@@ -313,6 +359,17 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
           rows={preview.rows}
           saving={saving}
           onSave={() => handleSaveMenu(preview.rows)}
+        />
+      )}
+
+      {preview?.type === 'worklog' && (
+        <WorklogPreview
+          shifts={preview.shifts}
+          staff={preview.staff}
+          months={preview.months}
+          warnings={preview.warnings}
+          saving={saving}
+          onSave={() => handleSaveWorklog(preview)}
         />
       )}
 
