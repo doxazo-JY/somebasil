@@ -1,5 +1,6 @@
 import { createServerClient } from '../server'
 import { fetchAllRows } from '../fetchAll'
+import { fetchExpenseAdjustments, applyExpenseAdjustments } from '../expense-adjustments'
 
 // 수익 진단용 월별 데이터 — 매출 / 고객(주문) 수 / 영업일 / 비용 구조
 // 고정비·변동비 분리 기준:
@@ -10,8 +11,10 @@ import { fetchAllRows } from '../fetchAll'
 export interface DiagnosisMonth {
   year: number
   month: number
-  /** POS 매출 (daily_sales 합계) */
+  /** 손익용 매출 = POS 매출 + 수동 조정(수입) — monthly_summary.income과 같은 기준 */
   sales: number
+  /** POS 매출 그대로 (객단가 계산용 — 주문 건수와 짝) */
+  posSales: number
   /** 주문(영수증) 건수 — 고객 수의 근사치 */
   orderCount: number
   /** 매출이 있었던 날 수 */
@@ -68,18 +71,30 @@ export async function getDiagnosisMonths(): Promise<DiagnosisMonth[]> {
   const now = kstNowYearMonth()
   const nowKey = now.year * 12 + now.month
 
-  const [summaryRes, expenseRows] = await Promise.all([
+  const [summaryRes, rawExpenseRows, expenseAdjustments, incomeAdjRes] = await Promise.all([
     supabase.from('monthly_summary').select('year, month, income'),
-    fetchAllRows<{ year: number; month: number; category: string; amount: number }>(
+    fetchAllRows<{ year: number; month: number; date: string | null; category: string; amount: number }>(
       (from, to) =>
         supabase
           .from('monthly_expenses')
-          .select('year, month, category, amount')
+          .select('year, month, date, category, amount')
           .neq('category', 'excluded')
           .range(from, to),
     ),
+    fetchExpenseAdjustments(supabase),
+    supabase.from('manual_adjustments').select('date, direction, amount').eq('type', 'income'),
   ])
   if (summaryRes.error) throw summaryRes.error
+  if (incomeAdjRes.error) throw incomeAdjRes.error
+
+  // 관리 > 설정의 수동 조정(제외 처리 등)을 카테고리별 지출·매출에 반영
+  const expenseRows = applyExpenseAdjustments(rawExpenseRows, expenseAdjustments)
+  const incomeDelta = new Map<string, number>()
+  for (const a of incomeAdjRes.data ?? []) {
+    const [y, m] = String(a.date).split('-').map(Number)
+    const key = `${y}-${m}`
+    incomeDelta.set(key, (incomeDelta.get(key) ?? 0) + (a.direction === 'add' ? a.amount : -a.amount))
+  }
 
   // 매출 있는 마감 월만
   const months = (summaryRes.data ?? [])
@@ -103,6 +118,8 @@ export async function getDiagnosisMonths(): Promise<DiagnosisMonth[]> {
       year: m.year,
       month: m.month,
       ...stats[i],
+      sales: stats[i].sales + (incomeDelta.get(`${m.year}-${m.month}`) ?? 0),
+      posSales: stats[i].sales,
       variableCost: (exp.ingredients_cash ?? 0) + (exp.ingredients_card ?? 0),
       labor: exp.labor ?? 0,
       fixed: exp.fixed ?? 0,

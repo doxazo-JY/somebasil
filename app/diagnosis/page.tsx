@@ -35,7 +35,7 @@ export default async function DiagnosisPage() {
       year: m.year,
       month: m.month,
       dailyCustomers: m.orderCount / m.operatingDays,
-      aov: m.sales / m.orderCount,
+      aov: m.posSales / m.orderCount, // 객단가는 POS 매출 그대로 (수동 조정 제외)
     }))
 
   return (

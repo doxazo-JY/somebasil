@@ -8,6 +8,8 @@ export interface DiagnosisBaseline {
   months: { year: number; month: number }[]
   /** 이하 전부 기준 기간 월평균 */
   sales: number
+  /** POS 매출 그대로 — 객단가용 */
+  posSales: number
   variableCost: number
   labor: number
   fixed: number
@@ -59,6 +61,7 @@ export function buildBaseline(months: DiagnosisMonth[], count = 3): DiagnosisBas
   return {
     months: picked.map(({ year, month }) => ({ year, month })),
     sales: avg((m) => m.sales),
+    posSales: avg((m) => m.posSales),
     variableCost: avg((m) => m.variableCost),
     labor: avg((m) => m.labor),
     fixed: avg((m) => m.fixed),
@@ -77,7 +80,7 @@ export function diagnose(b: DiagnosisBaseline): DiagnosisResult {
   const days = b.operatingDays
   const dailySales = b.sales / days
   const dailyCustomers = b.orderCount / days
-  const aov = b.orderCount > 0 ? b.sales / b.orderCount : 0
+  const aov = b.orderCount > 0 ? b.posSales / b.orderCount : 0
 
   const breakEvenDailySales = breakEvenSales !== null ? breakEvenSales / days : null
 

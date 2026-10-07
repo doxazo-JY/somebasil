@@ -1,19 +1,26 @@
 import { createServerClient } from '../server'
 import { fetchAllRows } from '../fetchAll'
+import { fetchExpenseAdjustments, applyExpenseAdjustments } from '../expense-adjustments'
 
-// 월별 지출 카테고리별 합계 (excluded 제외)
+// 월별 지출 카테고리별 합계 (excluded 제외, 수동 조정 반영)
 export async function getMonthlyExpensesByCategory(year: number, month: number) {
   const supabase = createServerClient()
-  const { data, error } = await supabase
-    .from('monthly_expenses')
-    .select('category, amount')
-    .eq('year', year)
-    .eq('month', month)
-    .neq('category', 'excluded')
+  const start = `${year}-${String(month).padStart(2, '0')}-01`
+  const end = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const [{ data, error }, adjustments] = await Promise.all([
+    supabase
+      .from('monthly_expenses')
+      .select('year, month, date, category, amount')
+      .eq('year', year)
+      .eq('month', month)
+      .neq('category', 'excluded'),
+    fetchExpenseAdjustments(supabase, start, end),
+  ])
 
   if (error) throw error
 
-  const grouped = (data ?? []).reduce<Record<string, number>>((acc, row) => {
+  const rows = applyExpenseAdjustments(data ?? [], adjustments)
+  const grouped = rows.reduce<Record<string, number>>((acc, row) => {
     acc[row.category] = (acc[row.category] ?? 0) + row.amount
     return acc
   }, {})
@@ -23,21 +30,24 @@ export async function getMonthlyExpensesByCategory(year: number, month: number) 
   return grouped
 }
 
-// 연도별 월별 카테고리별 지출 추이 (라인차트용, excluded 제외)
+// 연도별 월별 카테고리별 지출 추이 (라인차트용, excluded 제외, 수동 조정 반영)
 export async function getYearlyExpenseTrend(year: number) {
   const supabase = createServerClient()
-  const { data, error } = await supabase
-    .from('monthly_expenses')
-    .select('month, category, amount')
-    .eq('year', year)
-    .neq('category', 'excluded')
-    .order('month', { ascending: true })
+  const [{ data, error }, adjustments] = await Promise.all([
+    supabase
+      .from('monthly_expenses')
+      .select('year, month, date, category, amount')
+      .eq('year', year)
+      .neq('category', 'excluded')
+      .order('month', { ascending: true }),
+    fetchExpenseAdjustments(supabase, `${year}-01-01`, `${year + 1}-01-01`),
+  ])
 
   if (error) throw error
 
   // 월별로 카테고리 합산
   const byMonth: Record<number, Record<string, number>> = {}
-  for (const row of data ?? []) {
+  for (const row of applyExpenseAdjustments(data ?? [], adjustments)) {
     if (!byMonth[row.month]) byMonth[row.month] = {}
     byMonth[row.month][row.category] = (byMonth[row.month][row.category] ?? 0) + row.amount
   }

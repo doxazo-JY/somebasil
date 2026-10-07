@@ -121,6 +121,7 @@
 ### manual_adjustments — 수동 수입/지출 조정
 - id, date, type ('income' | 'expense'), direction ('add' | 'subtract'), amount, memo
 - 자동 분류 불가능한 거래를 월별 집계에 가감
+- 카테고리별 집계(진단·지출·대시보드)에도 반영: `lib/supabase/expense-adjustments.ts`가 같은 날짜·금액의 지출 건을 찾아 그 카테고리에서 가감 (짝 없으면 고정비). 수입 조정은 진단 매출에 반영, 객단가는 POS 그대로
 
 ### parsing_rules — 통장 거래내역 파싱 규칙
 - id, keyword, category, created_at
