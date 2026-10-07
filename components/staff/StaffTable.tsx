@@ -17,9 +17,11 @@ interface Staff {
 
 interface StaffTableProps {
   data: Staff[]
+  /** 상세 페이지 링크 표시 (상세의 수동 출퇴근 입력은 아직 미정비 — 기본 off) */
+  linkToDetail?: boolean
 }
 
-export default function StaffTable({ data }: StaffTableProps) {
+export default function StaffTable({ data, linkToDetail = false }: StaffTableProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-100">
       <table className="w-full text-sm">
@@ -30,7 +32,7 @@ export default function StaffTable({ data }: StaffTableProps) {
             <th className="text-left px-4 py-3">입사일</th>
             <th className="text-right px-4 py-3">시급</th>
             <th className="text-center px-4 py-3">상태</th>
-            <th className="px-4 py-3 w-10" />
+            {linkToDetail && <th className="px-4 py-3 w-10" />}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
@@ -51,6 +53,7 @@ export default function StaffTable({ data }: StaffTableProps) {
                   {staff.is_active ? '재직중' : '퇴직'}
                 </span>
               </td>
+              {linkToDetail && (
               <td className="px-4 py-3.5 text-right">
                 <Link
                   href={`/staff/${staff.id}`}
@@ -59,6 +62,7 @@ export default function StaffTable({ data }: StaffTableProps) {
                   →
                 </Link>
               </td>
+              )}
             </tr>
           ))}
         </tbody>
