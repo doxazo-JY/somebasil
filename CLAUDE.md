@@ -38,10 +38,12 @@
 - `/profit` — 손익 (YTD)
 - `/expenses` — 지출
 - `/menu` — 메뉴 분석 (히트맵 / 죽은 메뉴)
+- `/recipes` — 메뉴 원가
+- `/diagnosis` — 수익 진단 (고정비/변동비 손익분기 · 하루 필요 고객 · 목표 이익 · 고객수×객단가 · 시간대별 매출 vs 알바 인원 · 못 보는 항목과 이유)
 
 **관리**:
-- `/upload` — 업로드 + 거래 재분류(통장 탭) + 마스터 관리(메뉴 탭)
-- `/staff` — 직원 (현재 placeholder, 추후 구현)
+- `/upload` — 업로드 + 거래 재분류(통장 탭) + 마스터 관리(메뉴 탭) + 근무일지 탭
+- `/staff` — 직원 (조회 전용: KPI · 직원×월 근무시간/지급액 · 목록). 데이터는 근무일지 업로드로만 들어옴. `/staff/[id]` 상세는 링크 숨김 (수동 출퇴근 입력 미정비)
 - `/settings` — 설정 (대표 토글, 수동 조정)
 
 ## 사이드바 (3개 그룹) + PageTabs (그룹 내)
@@ -72,13 +74,21 @@
 - ※ 4/30 'card'(카드대금) 폐기 — catch-all = 사실상 재료비(카드). 기존 데이터는 `recalcAllMonths()`에서 ingredients_card로 1회 마이그레이션 (idempotent)
 
 ### staff — 직원 정보
-- id, name, role, hire_date, leave_date, hourly_pay, is_active, created_at
+- id, name, role, hire_date, leave_date, hourly_pay, sunday_hourly_pay, tax_rate, is_active, created_at
 - role: 'manager'(점장) | 'assistant'(매니저) | 'part_time'(알바생)
+- 근무일지 업로드가 이름으로 매칭/자동 등록 (part_time). is_active = 파일 마지막 달에 근무 있음
+
+### work_logs — 출퇴근 기록 (근무일지 업로드)
+- id, staff_id(→staff), date, start_time, end_time, hours_worked, hourly_rate, created_at
+- ⚠️ hours_worked = DB generated column → insert 시 넣으면 에러. `/api/work-logs` POST(구 수동 입력)가 아직 넣고 있어서 깨져 있음 (staff 상세 페이지 재사용 시 수정 필요)
+- hourly_rate = 근무 당시 시급 (평일/주일 블록·연도별로 다름, 10/4 컬럼 추가). 시간대별 인건비 계산은 이 값 우선, 없으면 staff 시급
+- 업로드 = 파일에 포함된 월 × 파일 속 직원 기록을 delete 후 insert (재업로드 idempotent, 트랜잭션 아님)
 
 ### staff_salary — 직원별 월별 인건비 (계산 전용)
 - id, staff_id(→staff), year, month, amount, created_at
 - UNIQUE (staff_id, year, month)
 - ⚠️ 지출 집계에 사용하지 않음 — "이번 달 이 직원한테 얼마 줘야 하나" 계산 전용
+- ⚠️ 정의 2개 공존: 근무일지 업로드 = Σ(시간×블록 시급), 주휴 제외 (엑셀 "총 지급액" 기준) / 구 `/api/work-logs` 재계산 = 주휴수당 포함. 현재는 업로드만 사용
 - 실제 인건비 지출은 통장 거래내역 업로드 시 monthly_expenses.labor로 기록됨
 
 ### daily_sales — POS 상품 라인 단위 매출
@@ -102,7 +112,7 @@
 
 ### upload_history — 업로드 히스토리
 - id, file_name, file_type, status, uploaded_at
-- file_type: 'daily_sales' | 'bank_transaction' | 'menu'
+- file_type: 'daily_sales' | 'bank_transaction' | 'menu' | 'recipe' | 'work_logs'
 
 ### system_settings — 범용 키/값 설정
 - key (text PK), value (jsonb), updated_at
@@ -124,8 +134,15 @@
   - 비정기 재료 키워드 → 재료비-카드 (ingredients_card)
   - 나머지 출금 → 재료비-카드 (ingredients_card, 기본값) ← 4/30 변경. outlier는 ReclassifyTable에서 수동 조정
 
-## 직원 직책 (현재 미구현, 추후 재설계)
-점장 / 매니저 / 알바생
+## 직원 직책
+점장 / 매니저 / 알바생 — 현재 DB에는 알바생만 (근무일지가 P.T. 전용).
+점장 급여는 통장 '점장급여' 메모로만 확인됨 (월 약 77~97만, 8월은 대표차입금과 섞임). 월급제 여부·고정 근무시간 확인 후 추가 예정
+
+## 근무일지 엑셀 구조 (`lib/worklog-parser.ts`)
+- 시트 = 한 달, 시트명 "26년 8월" 패턴
+- 블록 2개: 평일 / "주일 근무"(1.5배). 블록 시작 = A열 "이름" 행, 직원 열 = 다음 행 헤더 "시간" 위치, 직원당 4칸(출근·퇴근·실근무시간·휴게)
+- 시급 = "최저시급" 셀 바로 아래. 날짜 행 = A열 "M/D"
+- 블록 끝 "총 지급액" 행과 계산값 대조 → 1,000원/1% 넘게 다르면 warnings
 
 ## 데이터 업로드 방식
 - 일별 매출: POS 엑셀 파일 (YYYYMMDD.xlsx)
@@ -166,7 +183,8 @@
 
 ### sub_recipes / sub_recipe_items — 수제재료 배합
 - output_ingredient_id (UNIQUE — 한 수제재료당 1배합), output_quantity
-- 1단계 깊이 (수제 안에 수제 X)
+- 수제 안에 수제 허용 (10/7~, 재귀 계산 + 순환 방지). 예: 흑임자크림 ← 제조크림
+- output 단위는 자유 — 아이스티 원액은 unit '잔' (output_quantity = 잔 수, 메뉴 레시피 quantity 1)
 
 ### packaging_sets / packaging_set_items — 포장세트
 - (product_category, serve_temp) UNIQUE — 카테고리×온도 매핑
@@ -176,8 +194,11 @@
 - `notes/레시피_템플릿_v5.xlsx` — 점장 입력용 (4시트: 재료/서브레시피/레시피/포장세트)
 - 생성 스크립트: `notes/_make_recipe_template_v5.py`
 - 부분 입력 OK — 누락은 `missing_price` / `no_recipe` 상태로 표시
+- 엑셀 재업로드는 파일에 있는 재료/서브레시피/메뉴만 교체 → DB 직접 입력분은 유지
+- 카톡 등으로 받은 레시피를 DB에 직접 넣은 기록 + 점장 확인 대기 질문: `docs/원가-입력-현황.md`
+- 알려진 구멍: 포장세트는 `extractTemp(name)`으로 HOT/ICE 판별 → "복숭아아이스티"처럼 이름에 ICE가 없으면 tea/null 세트를 찾다가 포장비 0. 콜드컵 뚜껑 단가도 미등록
 
-## 현재 작업 단계 (4/29 기준)
+## 현재 작업 단계 (10/7 기준)
 
 완성된 영역:
 - [x] 대시보드 콕핏 (InsightBanner / KPI 클릭 / DeficitSignals / 매출 달력 / 메모 / 트렌드)
@@ -187,12 +208,16 @@
 - [x] 업로드 + 재분류 (탭별 분리, 레시피 탭 추가)
 - [x] 모바일 대응 (콕핏 = 폰 OK, 관리 = PC 전용)
 - [x] 메뉴 원가 파이프라인 (DB 5테이블 + 업로드 파서 + 원가 계산 함수 + `/recipes` 페이지)
+- [x] 수익 진단 `/diagnosis` (10/4)
+- [x] 근무일지 업로드 + 시간대별 알바 효율 + `/staff` 조회 화면 (10/4~10/7)
 
 외부 데이터 대기:
-- [ ] 메뉴 원가 입력 (점장 v5 엑셀 채워서 업로드)
-- [ ] 직원/인건비 (회계사 데이터, 현재 placeholder)
+- [ ] 메뉴 원가 입력 (점장 엑셀 + 카톡분. 대기 질문은 `docs/원가-입력-현황.md`)
+- [ ] 점장·매니저 근무/급여 구조 (근무일지 밖)
 
 다음 작업 후보:
+- [ ] 아이스티 등 이름에 ICE 없는 아이스 메뉴 포장세트 매칭
+- [ ] 지출 카테고리 세분화 (임대료/공과금/카드수수료) + 사장 인건비 가정값 → 진단 페이지
 - [ ] 재료 1세트 회수율 화면 (현금 4종 — 봉지 단위, 카드 — 월 단위)
 - [ ] `CostRatioCards` / `DeficitSignals` 원가율 pending 해제 (대부분 메뉴 원가 등록 후)
 - [ ] 신호등 절대 임계값 (운영 6개월)
