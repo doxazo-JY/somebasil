@@ -110,8 +110,8 @@ function latestPrice(
   return candidates[0]?.unit_price ?? null
 }
 
-// 수제재료 잔당 단가 = Σ(구성재료 단가 × 사용량) / 산출량
-// 1단계만 (수제 안에 수제 X)
+// 수제재료 단위당 단가 = Σ(구성재료 단가 × 사용량) / 산출량
+// 수제 안에 수제 허용 (예: 흑임자크림 ← 제조크림) — 재귀 계산, visited로 순환 방지
 function computeMadePrice(
   ingredientId: number,
   ingredients: Map<number, IngredientRow>,
@@ -119,36 +119,32 @@ function computeMadePrice(
   subRecipes: Map<number, SubRecipeRow>,
   subRecipeItems: SubRecipeItemRow[],
   asOfDate: string,
+  visited: Set<number> = new Set(),
 ): { price: number | null; missing: string[] } {
+  const ing = ingredients.get(ingredientId)
+  if (visited.has(ingredientId)) {
+    return { price: null, missing: [`${ing?.name ?? ingredientId} (서브레시피 순환 참조)`] }
+  }
   const sub = subRecipes.get(ingredientId)
   if (!sub) {
-    const ing = ingredients.get(ingredientId)
     return { price: null, missing: ing ? [`${ing.name} (서브레시피 미등록)`] : [] }
   }
   const items = subRecipeItems.filter((it) => it.sub_recipe_id === sub.id)
   if (items.length === 0) {
-    const ing = ingredients.get(ingredientId)
     return { price: null, missing: ing ? [`${ing.name} (서브레시피 구성 비어있음)`] : [] }
   }
+  const nextVisited = new Set(visited).add(ingredientId)
   let total = 0
   const missing: string[] = []
   for (const it of items) {
-    const ing = ingredients.get(it.ingredient_id)
-    if (!ing) {
-      missing.push(`재료 id=${it.ingredient_id}`)
+    const r = resolveIngredientPrice(
+      it.ingredient_id, ingredients, prices, subRecipes, subRecipeItems, asOfDate, nextVisited,
+    )
+    if (r.price == null) {
+      missing.push(...r.missing)
       continue
     }
-    if (ing.kind !== 'purchased') {
-      // 1단계 제한 — 수제 안에 수제는 무시 (현재 미지원)
-      missing.push(`${ing.name} (수제재료 중첩 미지원)`)
-      continue
-    }
-    const p = latestPrice(prices, ing.id, asOfDate)
-    if (p == null) {
-      missing.push(`${ing.name} (단가 미등록)`)
-      continue
-    }
-    total += p * it.quantity
+    total += r.price * it.quantity
   }
   if (missing.length > 0) return { price: null, missing }
   return { price: total / sub.output_quantity, missing: [] }
@@ -162,6 +158,7 @@ function resolveIngredientPrice(
   subRecipes: Map<number, SubRecipeRow>,
   subRecipeItems: SubRecipeItemRow[],
   asOfDate: string,
+  visited: Set<number> = new Set(),
 ): { price: number | null; missing: string[] } {
   const ing = ingredients.get(ingredientId)
   if (!ing) return { price: null, missing: [`재료 id=${ingredientId} 없음`] }
@@ -170,7 +167,7 @@ function resolveIngredientPrice(
     if (p == null) return { price: null, missing: [`${ing.name} (단가 미등록)`] }
     return { price: p, missing: [] }
   }
-  return computeMadePrice(ingredientId, ingredients, prices, subRecipes, subRecipeItems, asOfDate)
+  return computeMadePrice(ingredientId, ingredients, prices, subRecipes, subRecipeItems, asOfDate, visited)
 }
 
 export async function getAllMenuCosts(asOfDate?: string): Promise<MenuCost[]> {
