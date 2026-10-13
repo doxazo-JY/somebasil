@@ -59,7 +59,7 @@ export default function WeeklyCategoryMix({ current, prev }: Props) {
         <p className="text-sm text-gray-400 py-8 text-center">데이터 없음</p>
       ) : (
         <ul className="flex flex-col gap-2.5">
-          {current.map(({ category, amount, pct }) => {
+          {current.map(({ category, pct }) => {
             const label = CATEGORY_LABEL[category] ?? category
             const color = CATEGORY_HEX[category] ?? '#c4c7cc'
             const prevPct = prevMap.get(category)

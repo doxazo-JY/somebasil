@@ -47,7 +47,7 @@
 
 **관리**:
 - `/upload` — 업로드 + 거래 재분류(통장 탭) + 마스터 관리(메뉴 탭) + 근무일지 탭
-- `/staff` — 직원. 탭 2개: 근무(QR 기준 월 숫자·근무일지 엑셀 → 출퇴근 기록 → 직원별 합계·수기 항목 → 종이 근무일지 기준 표[병행 기간만]) / 직원·설정(직원 목록·폰·연결 QR·퇴사·삭제 + 카운터 QR·시급). `/staff/[id]` 상세는 링크 숨김
+- `/staff` — 직원. 탭 2개: 근무(QR 기준 월 숫자·근무일지 엑셀 → 출퇴근 기록 → 직원별 합계·수기 항목 → 종이 근무일지 기준 표[병행 기간만]) / 직원·설정(직원 목록·폰·연결 QR·퇴사·삭제 + 카운터 QR·시급). 직원 추가는 QR 첫 등록·근무일지 업로드로만
 - `/clock` — 직원용 QR 출퇴근 (로그인 없음, 사이드바 없음)
 - `/settings` — 설정 (대표 토글, 수동 조정)
 
@@ -85,7 +85,7 @@
 
 ### work_logs — 출퇴근 기록 (근무일지 업로드)
 - id, staff_id(→staff), date, start_time, end_time, hours_worked, hourly_rate, created_at
-- ⚠️ hours_worked = DB generated column → insert 시 넣으면 에러. `/api/work-logs` POST(구 수동 입력)가 아직 넣고 있어서 깨져 있음 (staff 상세 페이지 재사용 시 수정 필요)
+- ⚠️ hours_worked = DB generated column → insert 시 넣으면 에러
 - hourly_rate = 근무 당시 시급 (평일/주일 블록·연도별로 다름, 10/4 컬럼 추가). 시간대별 인건비 계산은 이 값 우선, 없으면 staff 시급
 - 업로드 = 파일에 포함된 월 × 파일 속 직원 기록을 delete 후 insert (재업로드 idempotent, 트랜잭션 아님)
 
@@ -93,7 +93,7 @@
 - id, staff_id(→staff), year, month, amount, created_at
 - UNIQUE (staff_id, year, month)
 - ⚠️ 지출 집계에 사용하지 않음 — "이번 달 이 직원한테 얼마 줘야 하나" 계산 전용
-- ⚠️ 정의 2개 공존: 근무일지 업로드 = Σ(시간×블록 시급), 주휴 제외 (엑셀 "총 지급액" 기준) / 구 `/api/work-logs` 재계산 = 주휴수당 포함. 현재는 업로드만 사용
+- 근무일지 업로드 = Σ(시간×블록 시급), 주휴 제외 (엑셀 "총 지급액" 기준)
 - 실제 인건비 지출은 통장 거래내역 업로드 시 monthly_expenses.labor로 기록됨
 
 ### 출퇴근 QR (10/13, `supabase/migrations/20261013_attendance*.sql` 적용 완료)

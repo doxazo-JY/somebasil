@@ -41,7 +41,7 @@ export default function IncomeBasisToggle({ initialValue }: Props) {
       <p className="text-xs text-gray-400 mt-1 leading-relaxed">
         순이익·이익률·손익분기 계산을 어느 수입 숫자로 할지 선택합니다.
         <br />
-        매출(POS)·통장 입금 카드는 항상 그대로 표시되고, 이 토글은 "이익" 계산에만 영향을 줍니다.
+        매출(POS)·통장 입금 카드는 항상 그대로 표시되고, 이 토글은 &lsquo;이익&rsquo; 계산에만 영향을 줍니다.
       </p>
       <div className="flex gap-2 mt-4">
         <button

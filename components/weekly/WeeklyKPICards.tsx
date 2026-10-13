@@ -80,7 +80,6 @@ export default function WeeklyKPICards({
   orderCount,
   hasExpenseData,
   prev,
-  isPartial,
 }: Props) {
   return (
     <>
