@@ -7,8 +7,8 @@ import { usePathname, useSearchParams } from 'next/navigation'
 // 운영: 매일/매주 본다. 결산: 월말 본다. 관리: 데이터·인력 운영.
 const NAV_ITEMS = [
   { label: '운영', href: '/', group: ['/', '/weekly', '/inbox', '/marketing'] },
-  { label: '결산', href: '/profit', group: ['/profit', '/expenses', '/menu', '/recipes', '/diagnosis'] },
-  { label: '관리', href: '/upload', group: ['/upload', '/staff', '/settings'] },
+  { label: '결산', href: '/profit', group: ['/profit', '/expenses', '/menu'] },
+  { label: '관리', href: '/upload', group: ['/upload', '/staff'] },
 ]
 
 export default function Sidebar() {
@@ -24,7 +24,11 @@ export default function Sidebar() {
 
   // 그룹 이동 시 기간 필터 유지 (?year=&month= 등)
   // 페이지가 사용하지 않는 쿼리는 무시되므로 무해
-  const qs = searchParams.toString()
+  // 보기 전환(?view= · ?fix=)은 페이지마다 달라서 넘기지 않음
+  const keep = new URLSearchParams(searchParams.toString())
+  keep.delete('view')
+  keep.delete('fix')
+  const qs = keep.toString()
   const withQs = (href: string) => (qs ? `${href}?${qs}` : href)
 
   return (

@@ -23,5 +23,5 @@ export const OFFICE_AGENTS: OfficeAgent[] = [
   { key: 'assistant', name: '비서 AI', role: '궁금한 걸 물어보면 매출·메뉴·지출·근무시간 기록을 직접 찾아보고 답해요.', schedule: '물어볼 때', run: null, usesAi: true, chat: true, shirt: '#5a6fa8', hair: '#1f1f1f' },
   { key: 'cashflow', name: '자금 관리 AI', role: '통장 거래로 앞으로 30일 동안 잔고가 부족해질 위험을 미리 알려요.', schedule: '통장 올리면 (주 1번)', run: 'cashflow', usesAi: true, shirt: '#c98a22', hair: '#4a3426' },
   { key: 'attendance', name: '직원 관리 AI', role: 'QR 출퇴근 기록에서 퇴근 누락과 주휴수당 대상을 찾아요. 보건증·위생교육 만료 알림은 직원별 날짜를 입력하면 추가돼요.', schedule: '매일 오전 8시', run: 'attendance', usesAi: false, link: { href: '/staff', label: '직원 화면 열기' }, shirt: '#1a5c3a', hair: '#222222' },
-  { key: 'cost', name: '원가 AI', role: '원가 계산이 막힌 곳(재료 가격·직접 만드는 재료 배합·메뉴 레시피)을 찾아, 많이 풀리는 것부터 한 주에 3개까지 물어봐요. 답을 적으면 정리해서 보여 주고, 확인하면 저장해요.', schedule: '매주 월요일 오전 8시', run: 'cost', usesAi: true, link: { href: '/recipes', label: '원가 화면 열기' }, shirt: '#7a6aa8', hair: '#2b2b2b' },
+  { key: 'cost', name: '원가 AI', role: '원가 계산이 막힌 곳(재료 가격·직접 만드는 재료 배합·메뉴 레시피)을 찾아, 많이 풀리는 것부터 한 주에 3개까지 물어봐요. 답을 적으면 정리해서 보여 주고, 확인하면 저장해요.', schedule: '매주 월요일 오전 8시', run: 'cost', usesAi: true, link: { href: '/menu?view=cost', label: '원가 화면 열기' }, shirt: '#7a6aa8', hair: '#2b2b2b' },
 ]

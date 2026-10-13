@@ -1,4 +1,6 @@
 import PageTabs from '@/components/ui/PageTabs'
+import SubTabs from '@/components/ui/SubTabs'
+import RecipesView from '@/components/recipes/RecipesView'
 import WeekdayHourHeatmap from '@/components/menu/WeekdayHourHeatmap'
 import HeatmapRangeSelector, {
   RANGE_LABELS,
@@ -58,13 +60,28 @@ function heatmapSinceDate(range: HeatmapRange): string {
 }
 
 interface PageProps {
-  searchParams: Promise<{ heatmap?: string }>
+  searchParams: Promise<{ heatmap?: string; view?: string }>
 }
 
 const VALID_RANGES: HeatmapRange[] = ['4w', '8w', '12w', 'month', 'all']
 
+// 메뉴 — 보기 2개: 판매 패턴(기본) / 원가(?view=cost, 예전 /recipes)
+const VIEWS = [
+  { key: 'sales', label: '판매 패턴' },
+  { key: 'cost', label: '원가' },
+]
+
 export default async function MenuAnalysisPage({ searchParams }: PageProps) {
   const params = await searchParams
+  if (params.view === 'cost') {
+    return (
+      <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+        <PageTabs group="settlement" />
+        <SubTabs items={VIEWS} />
+        <RecipesView />
+      </div>
+    )
+  }
   const heatmapRange: HeatmapRange = VALID_RANGES.includes(params.heatmap as HeatmapRange)
     ? (params.heatmap as HeatmapRange)
     : 'all'
@@ -90,6 +107,7 @@ export default async function MenuAnalysisPage({ searchParams }: PageProps) {
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <PageTabs group="settlement" />
+      <SubTabs items={VIEWS} />
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">메뉴 분석</h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">

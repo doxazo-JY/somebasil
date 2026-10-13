@@ -10,25 +10,32 @@ import { getMonthlyAllTransactions } from '@/lib/supabase/queries/expenses'
 import { getMasterProducts } from '@/lib/supabase/queries/menu'
 import { getWeekCoverage } from '@/lib/upload/coverage'
 import { pickAgentsAfterUpload } from '@/lib/ai/agents/after-upload'
+import ManualAdjustments from '@/components/settings/ManualAdjustments'
+import IncomeBasisToggle from '@/components/settings/IncomeBasisToggle'
+import RecalcButton from '@/components/settings/RecalcButton'
+import { getManualAdjustments } from '@/lib/supabase/queries/adjustments'
+import { getIncomeBasis } from '@/lib/supabase/queries/settings'
 
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  searchParams: Promise<{ year?: string; month?: string }>
+  searchParams: Promise<{ year?: string; month?: string; fix?: string }>
 }
 
-// 데이터 넣기 (파일 하나로 받기) + 데이터 고치기 (통장 분류 · 메뉴 목록)
+// 데이터 넣기 (파일 하나로 받기) + 데이터 고치기 (통장 분류 · 메뉴 목록 · 수동 조정 · 계산 기준)
 export default async function UploadPage({ searchParams }: PageProps) {
   const params = await searchParams
   const now = new Date()
   const year = Number(params.year ?? now.getFullYear())
   const month = Number(params.month ?? now.getMonth() + 1)
 
-  const [history, allTransactions, masterProducts, coverage] = await Promise.all([
+  const [history, allTransactions, masterProducts, coverage, adjustments, incomeBasis] = await Promise.all([
     getUploadHistory(),
     getMonthlyAllTransactions(year, month),
     getMasterProducts(),
     getWeekCoverage(),
+    getManualAdjustments(),
+    getIncomeBasis(),
   ])
   // 체크리스트 문구용 — 이번 주 자동 분석을 이미 했는지 (AI는 실행하지 않음)
   const { weeklyDone } = await pickAgentsAfterUpload(coverage, false).catch(() => ({ weeklyDone: false }))
@@ -51,15 +58,25 @@ export default async function UploadPage({ searchParams }: PageProps) {
         </div>
         <div className="hidden md:block">
           <FixTabs
-            bank={
-              <>
-                <div className="flex justify-end mb-3">
-                  <MonthFilter year={year} month={month} />
+            initial={params.fix}
+            views={{
+              bank: (
+                <>
+                  <div className="flex justify-end mb-3">
+                    <MonthFilter year={year} month={month} />
+                  </div>
+                  <ReclassifyTable items={allTransactions} />
+                </>
+              ),
+              menu: <MasterManager products={masterProducts} />,
+              adjust: <ManualAdjustments items={adjustments} />,
+              basis: (
+                <div className="space-y-6 max-w-3xl">
+                  <IncomeBasisToggle initialValue={incomeBasis} />
+                  <RecalcButton />
                 </div>
-                <ReclassifyTable items={allTransactions} />
-              </>
-            }
-            menu={<MasterManager products={masterProducts} />}
+              ),
+            }}
           />
         </div>
         <p className="md:hidden text-xs text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-lg [word-break:keep-all]">

@@ -107,7 +107,7 @@ export async function runCostAgent(trigger: RunTrigger, now = new Date()) {
           ],
           action: q.question,
           period: today,
-          link: '/recipes',
+          link: '/menu?view=cost',
           meta,
         }
       })

@@ -5,27 +5,25 @@ import { usePathname, useSearchParams } from 'next/navigation'
 
 type GroupKey = 'operations' | 'settlement' | 'admin'
 
-const GROUPS: Record<GroupKey, { label: string; href: string }[]> = {
+// also: 탭은 없지만 이 탭에 속한 화면 (마케팅 화면은 사무실 마케팅 AI 자리에서 들어감)
+// 진단 → 손익 > 흑자 조건, 원가 → 메뉴 > 원가, 설정 → 데이터 > 데이터 고치기 (10/16 탭 정리)
+const GROUPS: Record<GroupKey, { label: string; href: string; also?: string[] }[]> = {
   // 매일/매주 — 점장 운영용
   operations: [
     { label: '대시보드', href: '/' },
     { label: '주간', href: '/weekly' },
-    { label: '사무실', href: '/inbox' },
-    { label: '마케팅', href: '/marketing' },
+    { label: '사무실', href: '/inbox', also: ['/marketing'] },
   ],
   // 월말 결산 — 사장 보고/의사결정
   settlement: [
     { label: '손익', href: '/profit' },
     { label: '지출', href: '/expenses' },
     { label: '메뉴', href: '/menu' },
-    { label: '원가', href: '/recipes' },
-    { label: '진단', href: '/diagnosis' },
   ],
   // 데이터·인력 관리
   admin: [
-    { label: '업로드', href: '/upload' },
+    { label: '데이터', href: '/upload' },
     { label: '직원', href: '/staff' },
-    { label: '설정', href: '/settings' },
   ],
 }
 
@@ -43,9 +41,14 @@ export default function PageTabs({ group }: PageTabsProps) {
 
   return (
     <div className="flex gap-1 mb-5 border-b border-gray-100">
-      {tabs.map(({ label, href }) => {
-        const active = href === pathname
-        const hrefWithQs = qs ? `${href}?${qs}` : href
+      {tabs.map(({ label, href, also }) => {
+        const active = href === pathname || !!also?.includes(pathname)
+        // 보기 전환(?view= · ?fix=)은 다른 탭으로 넘기지 않음 — 기간 필터만 이어감
+        const keep = new URLSearchParams(qs)
+        keep.delete('view')
+        keep.delete('fix')
+        const rest = keep.toString()
+        const hrefWithQs = rest ? `${href}?${rest}` : href
         return (
           <Link
             key={href}

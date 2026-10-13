@@ -3,7 +3,9 @@ import YearFilter from '@/components/ui/YearFilter'
 import ProfitStatCards from '@/components/profit/ProfitStatCards'
 import ProfitTrendChart from '@/components/profit/ProfitTrendChart'
 import MonthlyBreakdownTable from '@/components/profit/MonthlyBreakdownTable'
-import BreakEvenSection from '@/components/profit/BreakEvenSection'
+import Link from 'next/link'
+import SubTabs from '@/components/ui/SubTabs'
+import DiagnosisView from '@/components/diagnosis/DiagnosisView'
 import MarginBreakdown from '@/components/profit/MarginBreakdown'
 import { getYearlySummary, getMemosForYear } from '@/lib/supabase/queries/dashboard'
 import { getYearlyMaterialMetrics } from '@/lib/supabase/queries/material-cost'
@@ -17,8 +19,14 @@ const MATERIAL_RELIABLE_THRESHOLD = 0.8
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  searchParams: Promise<{ year?: string }>
+  searchParams: Promise<{ year?: string; view?: string }>
 }
+
+// 손익 — 보기 2개: 월별 손익(기본) / 흑자 조건(?view=check, 예전 /diagnosis)
+const VIEWS = [
+  { key: 'monthly', label: '월별 손익' },
+  { key: 'check', label: '흑자 조건' },
+]
 
 function formatManwon(v: number) {
   const abs = Math.round(Math.abs(v) / 10000)
@@ -27,6 +35,15 @@ function formatManwon(v: number) {
 
 export default async function ProfitPage({ searchParams }: PageProps) {
   const params = await searchParams
+  if (params.view === 'check') {
+    return (
+      <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
+        <PageTabs group="settlement" />
+        <SubTabs items={VIEWS} />
+        <DiagnosisView />
+      </div>
+    )
+  }
   const now = new Date()
   const year = Number(params.year ?? now.getFullYear())
 
@@ -64,14 +81,13 @@ export default async function ProfitPage({ searchParams }: PageProps) {
     (d) => d.income > 0 || d.total_expense > 0,
   ).length
 
-  // 월평균 — BreakEvenSection 입력
-  const avgIncome = monthsWithData > 0 ? ytdIncome / monthsWithData : 0
-  const avgExpense = monthsWithData > 0 ? ytdExpense / monthsWithData : 0
+  // 월평균 이익 — 흑자 조건 요약 상자
   const avgProfit = monthsWithData > 0 ? ytdProfit / monthsWithData : 0
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <PageTabs group="settlement" />
+      <SubTabs items={VIEWS} />
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
@@ -94,12 +110,18 @@ export default async function ProfitPage({ searchParams }: PageProps) {
           isBank={isBank}
         />
         <div className="col-span-2 sm:col-span-3 lg:col-span-3">
-          <BreakEvenSection
-            income={avgIncome}
-            expense={avgExpense}
-            profit={avgProfit}
-            periodLabel="월평균"
-          />
+          {/* 손익분기는 '흑자 조건' 보기에서 자세히 (예전 진단 페이지와 겹치던 상자 대신 요약 + 이동) */}
+          <Link
+            href={`/profit?${new URLSearchParams({ ...(params.year ? { year: params.year } : {}), view: 'check' })}`}
+            className="h-full flex flex-col justify-center rounded-xl border border-gray-100 bg-white px-5 py-4 hover:border-[#1a5c3a]/40 transition-colors"
+          >
+            <p className="text-xs text-gray-400">월평균 이익 ({monthsWithData}개월)</p>
+            <p className={`text-xl font-bold tabular-nums ${avgProfit >= 0 ? 'text-[#1a5c3a]' : 'text-red-500'}`}>{formatManwon(avgProfit)}원</p>
+            <p className="text-xs text-gray-500 mt-1 [word-break:keep-all]">
+              {avgProfit >= 0 ? '흑자예요.' : '적자예요.'} 하루 몇 명이 와야 흑자인지는{' '}
+              <span className="text-[#1a5c3a] font-medium">흑자 조건 보기 →</span>
+            </p>
+          </Link>
         </div>
       </div>
 
