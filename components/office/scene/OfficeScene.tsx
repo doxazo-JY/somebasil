@@ -35,12 +35,11 @@ type Char = {
   restTimer: number // 다음 이동까지 남은 시간(초)
 }
 
-const WALK_SPEED = 3 // 칸/초
+const WALK_SPEED = 2 // 칸/초 — 걷는 게 눈에 보이게 천천히
 const SIT_OFFSET = 6 // 앉으면 6px 아래로 (Pixel Agents 값)
 const FRAME_W = 16
 const FRAME_H = 32
 const DIR_ROW: Record<Dir, number> = { down: 0, up: 1, right: 2, left: 2 }
-const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // ── 이미지 로드 (한 번만)
 const imageCache = new Map<string, Promise<HTMLImageElement>>()
@@ -149,7 +148,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           const pick = free[Math.floor(Math.random() * free.length)] ?? { s: REST_SPOTS[0], i: 0 }
           goal = pick.s
           goalKey = `rest:${pick.i}`
-          ch.restTimer = 20 + Math.random() * 40
+          ch.restTimer = 12 + Math.random() * 18
         }
         if (goal && goalKey !== ch.target) {
           ch.target = goalKey
@@ -176,7 +175,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
             pose: 'stand',
             target: startAtSeat ? 'seat' : `rest:${restIdx}`,
             t: Math.random() * 2,
-            restTimer: 20 + Math.random() * 40,
+            restTimer: 12 + Math.random() * 18,
           })
         }
         for (const k of [...chars.keys()]) if (!agentsRef.current.some((a) => a.key === k && !a.vacant)) chars.delete(k)
@@ -190,7 +189,6 @@ export default function OfficeScene({ agents, selected, onSelect }: {
         const dt = Math.min(0.1, (now - last) / 1000)
         last = now
         ensureChars()
-        const still = reducedMotion()
 
         for (const ch of chars.values()) {
           const a = agentsRef.current.find((x) => x.key === ch.key)!
@@ -201,7 +199,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
             const dx = next.col - ch.x
             const dy = next.row - ch.y
             const dist = Math.hypot(dx, dy)
-            const step = still ? dist : WALK_SPEED * dt
+            const step = WALK_SPEED * dt
             ch.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up'
             if (dist <= step) {
               ch.x = next.col
@@ -236,8 +234,8 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           const sitOff = sitting ? (ch.target === 'seat' ? DESK_SIT_OFFSET : SIT_OFFSET) : 0
           const frameIdx =
             ch.pose === 'walk' ? [0, 1, 2, 1][Math.floor(ch.t / 0.15) % 4]
-              : ch.pose === 'sit-type' ? (still ? 3 : 3 + (Math.floor(ch.t / 0.3) % 2))
-                : ch.pose === 'sit-read' ? (still ? 5 : 5 + (Math.floor(ch.t / 1.2) % 2))
+              : ch.pose === 'sit-type' ? 3 + (Math.floor(ch.t / 0.25) % 2)
+                : ch.pose === 'sit-read' ? 5 + (Math.floor(ch.t / 0.6) % 2)
                   : 1
           const px = Math.round(ch.x * TILE)
           const py = Math.round((ch.y + 1) * TILE - FRAME_H + sitOff)
