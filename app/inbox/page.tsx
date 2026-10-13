@@ -2,13 +2,14 @@ import PageTabs from '@/components/ui/PageTabs'
 import AgentPanel from '@/components/inbox/AgentPanel'
 import InboxList from '@/components/inbox/InboxList'
 import { getInbox, getRecentRuns } from '@/lib/supabase/queries/ai'
+import { aiConfigProblem } from '@/lib/ai/client'
 
 export const dynamic = 'force-dynamic'
 
 // AI 업무함 — AI 업무팀이 점검해서 챙길 일만 올리는 곳 (점장용, 폰에서도 봄)
 export default async function InboxPage() {
   const [{ open, closed }, runs] = await Promise.all([getInbox(), getRecentRuns(10)])
-  const hasKey = !!process.env.ANTHROPIC_API_KEY
+  const configProblem = aiConfigProblem()
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full max-w-3xl">
@@ -20,7 +21,7 @@ export default async function InboxPage() {
         </p>
       </div>
       <div className="space-y-4">
-        <AgentPanel runs={runs} hasKey={hasKey} />
+        <AgentPanel runs={runs} configProblem={configProblem} />
         <InboxList open={open} closed={closed} />
       </div>
     </div>

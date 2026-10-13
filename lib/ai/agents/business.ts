@@ -1,9 +1,8 @@
 import { z } from 'zod'
-import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { getRecentWeekOptions, getWeekDetail, getWeeklySummary, type WeekDetail } from '@/lib/supabase/queries/weekly'
 import { getDiagnosisMonths } from '@/lib/supabase/queries/diagnosis'
-import { AI_MODEL, FALLBACK_BETAS, anthropic, recordRun, type RunTrigger } from '../client'
+import { generateStructured, recordRun, type RunTrigger } from '../client'
 
 // 경영 AI — 매주 수요일 아침, 지난주(월~일)를 분석해 "이번 주 꼭 볼 것 3가지"를 업무함에 올림
 // 읽는 데이터: 지난주 상세 · 그 전주 상세 · 최근 8주 추이 · 최근 3개월 비용 구조
@@ -81,24 +80,12 @@ export async function runBusinessAgent(trigger: RunTrigger) {
       최근월비용구조: months.slice(-3),
     }
 
-    const response = await anthropic().beta.messages.parse({
-      model: AI_MODEL,
-      max_tokens: 16000,
-      betas: [...FALLBACK_BETAS],
-      fallbacks: 'default',
-      output_config: { effort: 'high', format: betaZodOutputFormat(OutputSchema) },
+    const { output, model, usage } = await generateStructured({
       system: SYSTEM,
-      messages: [
-        {
-          role: 'user',
-          content: `지난주(${last.label}, ${last.weekStart} ~ ${last.weekEnd}) 데이터입니다. 이번 주 꼭 볼 것 3가지를 정리해 주세요.\n\n${JSON.stringify(data)}`,
-        },
-      ],
+      user: `지난주(${last.label}, ${last.weekStart} ~ ${last.weekEnd}) 데이터입니다. 이번 주 꼭 볼 것 3가지를 정리해 주세요.\n\n${JSON.stringify(data)}`,
+      schema: OutputSchema,
+      name: 'weekly_business_report',
     })
-
-    if (response.stop_reason === 'refusal') throw new Error('AI가 요청을 거절했습니다 (refusal)')
-    const output = response.parsed_output
-    if (!output) throw new Error(`AI 결과를 읽지 못했습니다 (stop_reason: ${response.stop_reason})`)
 
     // 같은 주에 다시 돌리면 아직 처리 안 한 이전 항목은 새 결과로 교체
     const supabase = createServerClient()
@@ -122,8 +109,8 @@ export async function runBusinessAgent(trigger: RunTrigger) {
       summary: output.headline,
       output,
       period: last.weekStart,
-      usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
-      model: response.model,
+      usage,
+      model,
     }
   })
 }

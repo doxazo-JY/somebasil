@@ -11,7 +11,7 @@ function fmtDateTime(iso: string) {
 }
 
 // 경영 AI 상태 + [지금 실행] + 최근 실행 기록
-export default function AgentPanel({ runs, hasKey }: { runs: AiRun[]; hasKey: boolean }) {
+export default function AgentPanel({ runs, configProblem }: { runs: AiRun[]; configProblem: string | null }) {
   const router = useRouter()
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,13 +49,13 @@ export default function AgentPanel({ runs, hasKey }: { runs: AiRun[]; hasKey: bo
         </div>
         <button
           onClick={run}
-          disabled={running || !hasKey}
+          disabled={running || !!configProblem}
           className="text-xs px-3 py-1.5 rounded-lg border border-[#1a5c3a] text-[#1a5c3a] hover:bg-[#e6f0ea] disabled:opacity-40 whitespace-nowrap"
         >
           {running ? '점검하는 중… (1분 정도)' : '지금 점검하기'}
         </button>
       </div>
-      {!hasKey && <p className="text-xs text-amber-700 [word-break:keep-all]">Claude API 키(ANTHROPIC_API_KEY)가 설정되지 않아 실행할 수 없어요</p>}
+      {configProblem && <p className="text-xs text-amber-700 [word-break:keep-all]">{configProblem}</p>}
       {error && <p className="text-xs text-red-500 [word-break:keep-all]">{error}</p>}
 
       {runs.length > 0 && (
