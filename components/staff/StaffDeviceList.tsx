@@ -17,23 +17,31 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
   const router = useRouter()
   const [linkFor, setLinkFor] = useState<StaffRow | null>(null)
   const [deleteFor, setDeleteFor] = useState<StaffRow | null>(null)
+  // 퇴사·폰 해제는 화면 안에서 한 번 더 눌러 확인 (브라우저 확인창은 막혀 있으면 아무 일도 안 일어나서 쓰지 않음)
+  const [confirmLeave, setConfirmLeave] = useState<number | null>(null)
+  const [confirmRevoke, setConfirmRevoke] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function patchStaff(id: number, updates: object) {
-    await fetch('/api/staff', {
+    setError(null)
+    const res = await fetch('/api/staff', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...updates }),
-    })
+    }).catch(() => null)
+    if (!res?.ok) setError('저장하지 못했어요. 다시 시도해 주세요.')
     router.refresh()
   }
 
   async function revoke(deviceId: number) {
-    if (!confirm('이 폰의 등록을 해제할까요? 해제한 폰으로는 출퇴근을 찍을 수 없어요.')) return
-    await fetch('/api/attendance/devices', {
+    setError(null)
+    setConfirmRevoke(null)
+    const res = await fetch('/api/attendance/devices', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ device_id: deviceId }),
-    })
+    }).catch(() => null)
+    if (!res?.ok) setError('폰 등록을 해제하지 못했어요. 다시 시도해 주세요.')
     router.refresh()
   }
 
@@ -42,8 +50,9 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
       <div className="px-5 py-4 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-800">직원</p>
         <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
-          새 직원은 카운터 QR을 처음 찍을 때 자동으로 추가돼요. 폰을 바꾼 직원은 [연결 QR]을 눌러 새 폰으로 찍게 해 주세요.
+          새 직원은 카운터 QR을 처음 찍을 때 자동으로 추가돼요. 이미 목록에 있는 직원(근무일지로 들어온 직원 포함)이나 폰을 바꾼 직원은 [연결 QR]을 눌러 그 폰으로 찍게 해 주세요.
         </p>
+        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       </div>
       {staff.length === 0 ? (
         <p className="text-xs text-gray-400 text-center py-10">아직 등록된 직원이 없어요</p>
@@ -74,7 +83,14 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
                   s.devices.map((d) => (
                     <span key={d.id} className="inline-flex items-center gap-1.5 text-xs border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5 text-gray-600">
                       {d.label ?? '기기'} · <span className="text-gray-400">{fmtDay(d.last_used_at)}</span>
-                      <button onClick={() => revoke(d.id)} className="w-5 h-5 rounded-full hover:bg-gray-100 text-gray-400" aria-label={`${d.label} 등록 해제`}>×</button>
+                      {confirmRevoke === d.id ? (
+                        <>
+                          <button onClick={() => revoke(d.id)} className="px-1.5 rounded-full bg-red-500 text-white">해제</button>
+                          <button onClick={() => setConfirmRevoke(null)} className="px-1.5 rounded-full hover:bg-gray-100 text-gray-500">취소</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setConfirmRevoke(d.id)} className="w-5 h-5 rounded-full hover:bg-gray-100 text-gray-400" aria-label={`${d.label} 등록 해제`}>×</button>
+                      )}
                     </span>
                   ))
                 )}
@@ -85,15 +101,28 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
                     연결 QR
                   </button>
                 )}
-                <button
-                  onClick={() => {
-                    if (s.is_active && !confirm(`${s.name}님을 퇴사 처리할까요? 출퇴근을 더 찍을 수 없게 되고, 기록은 남아요.`)) return
-                    patchStaff(s.id, s.is_active ? { is_active: false, leave_date: new Date().toISOString().slice(0, 10) } : { is_active: true, leave_date: null })
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
-                >
-                  {s.is_active ? '퇴사 처리' : '복직'}
-                </button>
+                {confirmLeave === s.id ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                    퇴사 처리할까요? 기록은 남아요
+                    <button
+                      onClick={() => {
+                        setConfirmLeave(null)
+                        patchStaff(s.id, { is_active: false, leave_date: new Date().toISOString().slice(0, 10) })
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
+                    >
+                      퇴사
+                    </button>
+                    <button onClick={() => setConfirmLeave(null)} className="px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100">취소</button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => (s.is_active ? setConfirmLeave(s.id) : patchStaff(s.id, { is_active: true, leave_date: null }))}
+                    className="text-xs px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
+                  >
+                    {s.is_active ? '퇴사 처리' : '복직'}
+                  </button>
+                )}
                 <button
                   onClick={() => setDeleteFor(s)}
                   className="text-xs px-3 py-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50"

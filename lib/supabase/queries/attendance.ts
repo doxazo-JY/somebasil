@@ -171,10 +171,11 @@ export async function punch(
   return { ok: true, action: 'out', name: staff.name, at, clock_in: current.clock_in, minutes: closed.minutes_worked ?? 0 }
 }
 
-// 같은 이름의 재직 중 직원이 있는지 (공백 정리 후 비교)
+// 같은 이름의 직원이 있는지 (퇴사 포함, 공백 정리 후 비교)
 export async function isNameTaken(name: string): Promise<boolean> {
   const supabase = createServerClient()
-  const { data } = await supabase.from('staff').select('name').eq('is_active', true)
+  // 퇴사 처리한 직원 이름도 막음 — 같은 사람이 새 직원으로 중복 등록되지 않게 (돌아오면 점장이 복직 후 연결 QR)
+  const { data } = await supabase.from('staff').select('name')
   return (data ?? []).some((s) => s.name.trim().replace(/\s+/g, ' ') === name)
 }
 
