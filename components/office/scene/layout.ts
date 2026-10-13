@@ -58,13 +58,13 @@ export const FURNITURE: Furniture[] = [
   { src: `${CAFE}/MENU_BOARD.png`, col: 1, row: 0, fw: 2, fh: 2, onWall: true, dy: -4 },
   { src: `${F}/HANGING_PLANT/HANGING_PLANT.png`, col: 4, row: 0, fw: 1, fh: 2, onWall: true },
   { src: `${F}/SMALL_PAINTING_2/SMALL_PAINTING_2.png`, col: 6, row: 0, fw: 1, fh: 2, onWall: true },
-  // ── 카운터 (커피 머신 · 케이크 진열장 · 잔)
+  // ── 카운터 (커피 머신 · 케이크 진열장 · 잔) — 카운터 윗면은 그림 8~15px → 소품 바닥이 윗면 61px쯤 오게 dy 보정
   { src: `${CAFE}/COUNTER.png`, col: 0, row: 3, fw: 3, fh: 2 },
   { src: `${CAFE}/COUNTER.png`, col: 3, row: 3, fw: 3, fh: 2 },
-  { src: `${CAFE}/ESPRESSO.png`, col: 0, row: 3, fw: 1, fh: 1, bg: 1, dy: 11, z: ON_TOP },
-  { src: `${F}/COFFEE/COFFEE.png`, col: 1, row: 3, fw: 1, fh: 1, bg: 1, dy: 10, z: ON_TOP },
-  { src: `${CAFE}/CAKE_CASE.png`, col: 3, row: 3, fw: 1, fh: 1, bg: 1, dy: 11, z: ON_TOP },
-  { src: `${CAFE}/CAKE_CASE.png`, col: 4, row: 3, fw: 1, fh: 1, bg: 1, dy: 11, z: ON_TOP },
+  { src: `${CAFE}/ESPRESSO.png`, col: 0, row: 3, fw: 1, fh: 1, bg: 1, dy: -2, z: ON_TOP },
+  { src: `${F}/COFFEE/COFFEE.png`, col: 1, row: 3, fw: 1, fh: 1, bg: 1, dy: 6, z: ON_TOP },
+  { src: `${CAFE}/CAKE_CASE.png`, col: 3, row: 3, fw: 1, fh: 1, bg: 1, dy: -2, z: ON_TOP },
+  { src: `${CAFE}/CAKE_CASE.png`, col: 4, row: 3, fw: 1, fh: 1, bg: 1, dy: -2, z: ON_TOP },
   { src: `${F}/PLANT/PLANT.png`, col: 6, row: 2, fw: 1, fh: 2, bg: 1 },
   // ── 카페 테이블 2개 (양옆 의자)
   { src: `${F}/SMALL_TABLE/SMALL_TABLE_FRONT.png`, col: 2, row: 7, fw: 2, fh: 2, bg: 1 },
