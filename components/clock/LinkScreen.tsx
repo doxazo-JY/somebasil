@@ -5,10 +5,10 @@ import ClockShell, { CheckMark } from './ClockShell'
 
 type ViewState =
   | { kind: 'loading' }
-  | { kind: 'linked'; name: string }
+  | { kind: 'linked'; name: string; ticket: boolean }
   | { kind: 'error' }
 
-// 폰 교체 — 연결 QR 스캔 즉시 연결
+// 폰 연결 — 연결 QR 스캔 즉시 연결 → 입장권이 같이 오면 잠깐 뒤 출퇴근 화면(/clock)으로 넘어가 바로 출근
 export default function LinkScreen({ token }: { token: string }) {
   const [view, setView] = useState<ViewState>(() => (token ? { kind: 'loading' } : { kind: 'error' }))
   const started = useRef(false)
@@ -23,7 +23,10 @@ export default function LinkScreen({ token }: { token: string }) {
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}))
-        setView(res.ok ? { kind: 'linked', name: data.name } : { kind: 'error' })
+        if (!res.ok) return setView({ kind: 'error' })
+        setView({ kind: 'linked', name: data.name, ticket: !!data.ticket })
+        // 연결 QR 주소(토큰)는 남기지 않고 출퇴근 화면으로
+        if (data.ticket) setTimeout(() => window.location.replace('/clock'), 1200)
       })
       .catch(() => setView({ kind: 'error' }))
   }, [token])
@@ -54,7 +57,9 @@ export default function LinkScreen({ token }: { token: string }) {
       <CheckMark />
       <p className="text-lg font-bold text-gray-900 text-center">{view.name}님, 폰이 연결됐어요</p>
       <p className="text-sm text-gray-500 text-center [word-break:keep-all]">
-        출퇴근은 아직 기록되지 않았어요. 매장 카운터의 QR을 찍으면 출근·퇴근 버튼이 나와요.
+        {view.ticket
+          ? '출근·퇴근 화면으로 넘어갈게요…'
+          : '출퇴근은 아직 기록되지 않았어요. 매장 카운터의 QR을 찍으면 출근·퇴근 버튼이 나와요.'}
       </p>
     </ClockShell>
   )

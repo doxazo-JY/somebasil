@@ -22,6 +22,9 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
   const [confirmRevoke, setConfirmRevoke] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // 이름 바꾸기 (동명이인 구분용) — 근무일지 업로드가 이름으로 직원을 찾아서, 엑셀 이름도 같이 바꿔야 함
+  const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null)
+
   async function patchStaff(id: number, updates: object) {
     setError(null)
     const res = await fetch('/api/staff', {
@@ -29,8 +32,15 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...updates }),
     }).catch(() => null)
-    if (!res?.ok) setError('저장하지 못했어요. 다시 시도해 주세요.')
+    const data = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) setError(data.error ?? '저장하지 못했어요. 다시 시도해 주세요.')
     router.refresh()
+    return !!res?.ok
+  }
+
+  async function saveName() {
+    if (!renaming) return
+    if (await patchStaff(renaming.id, { name: renaming.name })) setRenaming(null)
   }
 
   async function revoke(deviceId: number) {
@@ -61,7 +71,40 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
           {staff.map((s) => (
             <li key={s.id} className={`px-5 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 ${s.is_active ? '' : 'opacity-50'}`}>
               <div className="min-w-[120px]">
-                <p className="text-sm text-gray-900 font-medium">{s.name}</p>
+                {renaming?.id === s.id ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      saveName()
+                    }}
+                    className="space-y-1"
+                  >
+                    <div className="flex gap-1">
+                      <input
+                        id={`rename-${s.id}`}
+                        value={renaming.name}
+                        onChange={(e) => setRenaming({ id: s.id, name: e.target.value })}
+                        maxLength={20}
+                        autoFocus
+                        className="w-28 text-sm border border-gray-200 rounded-lg px-2 py-1 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]"
+                      />
+                      <button type="submit" className="text-xs px-2 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30]">저장</button>
+                      <button type="button" onClick={() => setRenaming(null)} className="text-xs px-2 rounded-lg text-gray-500 hover:bg-gray-100">취소</button>
+                    </div>
+                    <p className="text-[11px] text-amber-700 max-w-[220px] [word-break:keep-all]">근무일지 엑셀의 이름도 똑같이 바꿔 주세요. 다르면 업로드 때 새 직원이 생겨요</p>
+                  </form>
+                ) : (
+                  <p className="text-sm text-gray-900 font-medium">
+                    {s.name}
+                    <button
+                      onClick={() => setRenaming({ id: s.id, name: s.name })}
+                      className="ml-1.5 text-[11px] font-normal text-gray-400 hover:text-[#1a5c3a]"
+                      aria-label={`${s.name} 이름 바꾸기`}
+                    >
+                      이름 바꾸기
+                    </button>
+                  </p>
+                )}
                 <p className="text-[11px] text-gray-400 tabular-nums">
                   {s.is_active ? `${s.hire_date} 입사` : '퇴사'}
                   {s.hourly_pay > 0 && ` · 시급 ${s.hourly_pay.toLocaleString('ko-KR')}`}

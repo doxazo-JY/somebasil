@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { consumeLinkToken, createDevice } from '@/lib/supabase/queries/attendance'
-import { setDeviceCookie } from '@/lib/attendance/session'
+import { consumeLinkToken, createDevice, getQrSecretValue } from '@/lib/supabase/queries/attendance'
+import { issueTicket, readClockSession, setDeviceCookie } from '@/lib/attendance/session'
 import { deviceLabel } from '@/lib/attendance/tokens'
 
-// 폰 교체 — 점장이 만든 연결 QR(10분, 1회용)을 새 폰으로 스캔
+// 폰 연결 — 점장이 매장에서 띄운 연결 QR(10분, 1회용)을 직원 폰으로 스캔 (기존 직원 첫 연결 · 폰 교체)
 // body: { token: 연결 QR 토큰 }
-// 출퇴근 기록은 하지 않음 (연결만). 이후 카운터 QR로 평소처럼 출퇴근
+// 연결 QR도 점장 앞에서 찍는 것이라 카운터 QR처럼 3분 입장권을 같이 줌 → 연결 화면에서 바로 출근 가능
 export async function POST(req: NextRequest) {
   const { token } = await req.json().catch(() => ({}))
   const staff = await consumeLinkToken(token)
@@ -15,9 +14,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const { cookieStore } = await readClockSession()
     const { token: deviceToken } = await createDevice(staff.id, deviceLabel(req.headers.get('user-agent')))
-    setDeviceCookie(await cookies(), deviceToken)
-    return NextResponse.json({ status: 'linked', name: staff.name })
+    setDeviceCookie(cookieStore, deviceToken)
+    const secret = await getQrSecretValue()
+    const ticketExpiresAt = secret ? issueTicket(cookieStore, secret) : null
+    return NextResponse.json({ status: 'linked', name: staff.name, ticket: !!ticketExpiresAt })
   } catch (error) {
     console.error('[POST /api/clock/link] error:', error)
     return NextResponse.json({ error: 'link_failed' }, { status: 500 })
