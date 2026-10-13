@@ -5,4 +5,4 @@
 - 캐릭터 6종: Pixel Agents가 [JIK-A-4, MetroCity Free Top Down Character Pack](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack)을 바탕으로 만든 것 — 원작 CC0
 
 ## 카페 소품 (public/office/cafe)
-COUNTER · ESPRESSO · CAKE_CASE · MENU_BOARD 는 이 프로젝트에서 직접 그린 그림 (Pixel Agents 톤에 맞춤).
+COUNTER · ESPRESSO · CAKE_CASE · MENU_BOARD · RECEPTION 은 이 프로젝트에서 직접 그린 그림 (Pixel Agents 톤에 맞춤). 생성 스크립트: `notes/_make_office_cafe.py` (`python notes/_make_office_cafe.py public/office/cafe`)

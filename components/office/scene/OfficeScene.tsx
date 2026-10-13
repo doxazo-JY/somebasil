@@ -111,6 +111,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
       const floorLounge = colorize(img(FLOOR.lounge.src), FLOOR.lounge.color)
       const floorOffice = colorize(img(FLOOR.office.src), FLOOR.office.color)
       const wall = colorize(img(WALL.src), WALL.color)
+      const wallCafe = colorize(img(WALL.src), WALL.cafe)
 
       // 바닥·벽은 한 번 그려 두기
       const base = document.createElement('canvas')
@@ -135,8 +136,12 @@ export default function OfficeScene({ agents, selected, onSelect }: {
       }
       // 뒷벽: 1행 한 줄. 양 끝은 끝 조각, 가운데는 가로로 이어지는 조각 (비트마스크 E=2, W=8)
       for (let c = 0; c < COLS; c++) {
-        const mask = (c < COLS - 1 ? 2 : 0) | (c > 0 ? 8 : 0)
-        bg.drawImage(wall, (mask % 4) * 16, Math.floor(mask / 4) * 32, 16, 32, c * TILE, WALL_ROW * TILE + TILE - 32, 16, 32)
+        // 카페 벽과 사무실 벽은 따로 이어서 경계에 끝 조각(기둥처럼 보임)
+        const cafe = c < LOUNGE_COLS
+        const sameRight = c < COLS - 1 && (c + 1 < LOUNGE_COLS) === cafe
+        const sameLeft = c > 0 && (c - 1 < LOUNGE_COLS) === cafe
+        const mask = (sameRight ? 2 : 0) | (sameLeft ? 8 : 0)
+        bg.drawImage(cafe ? wallCafe : wall, (mask % 4) * 16, Math.floor(mask / 4) * 32, 16, 32, c * TILE, WALL_ROW * TILE + TILE - 32, 16, 32)
       }
 
       const furniture = FURNITURE.map((f) => {

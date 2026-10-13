@@ -1,9 +1,9 @@
 import type { TileColor } from './colorize'
 
 // AI 사무실 배치 — 16px 타일, 가로 COLS × 세로 ROWS
-//   0~1행: 뒷벽 (벽 그림은 1행 바닥에 붙여 위로 32px)
-//   왼쪽 0~7열: 카페 (카운터·테이블·소파) — 할 일 없는 AI가 쉬는 곳
-//   오른쪽 8열~: 일하는 곳 — 1줄 비서 / 2줄 경영·마케팅 / 3줄 자금·직원·원가, 자리마다 색이 다른 러그
+//   0~1행: 뒷벽 (벽 그림은 1행 바닥에 붙여 위로 32px) — 카페 쪽은 바질 초록 벽
+//   왼쪽 0~7열: 카페 (카운터·테이블·마주 보는 소파) — 할 일 없는 AI가 쉬는 곳
+//   오른쪽 8열~: 일하는 곳 — 가운데 정렬 1줄 비서(안내 데스크) / 2줄 경영·마케팅 / 3줄 자금·직원·원가
 // 가구는 발자국(footprint) 왼쪽 위 타일 기준, 그림은 발자국 아래쪽에 맞춰 위로 그림 (Pixel Agents 규칙)
 
 export const TILE = 16
@@ -15,8 +15,12 @@ export const FLOOR = {
   lounge: { src: '/office/floors/floor_6.png', color: { h: 26, s: 40, b: -6, c: -72 } as TileColor },
   office: { src: '/office/floors/floor_1.png', color: { h: 36, s: 24, b: 18, c: -78 } as TileColor },
 }
-export const WALL = { src: '/office/walls/wall_0.png', color: { h: 34, s: 28, b: -2, c: -25 } as TileColor }
-export const LOUNGE_COLS = 8 // 0~7열 쉬는 곳
+export const WALL = {
+  src: '/office/walls/wall_0.png',
+  color: { h: 34, s: 28, b: -2, c: -25 } as TileColor,
+  cafe: { h: 105, s: 22, b: -4, c: -25 } as TileColor, // 카페 쪽 벽 (바질 초록)
+}
+export const LOUNGE_COLS = 8 // 0~7열 카페
 
 export type Furniture = {
   src: string
@@ -32,26 +36,29 @@ export type Furniture = {
 }
 
 const F = '/office/furniture'
+const CAFE = '/office/cafe'
 
-// 책상(3×2) 하나 + 뒤에 의자 + 책상 위 모니터(뒷면) — 사람은 책상 뒤에 앉아 정면을 봄
-function deskSet(col: number, row: number, extras: Furniture[] = []): Furniture[] {
-  return [
-    { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_FRONT.png`, col: col + 1, row: row - 2, fw: 1, fh: 2, bg: 1, dy: 8, z: -1 },
-    { src: `${F}/DESK/DESK_FRONT.png`, col, row, fw: 3, fh: 2, bg: 0 },
-    { src: `${F}/PC/PC_BACK.png`, col: col + 2, row, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
-    ...extras,
-  ]
-}
 // 책상 그림의 윗면은 32px 중 11px부터 — 소품 바닥이 윗면 안쪽에 오도록 dy 보정 (커피잔 기준 10)
 // z: ON_TOP — 책상(발자국 2행)보다 나중에 그려야 윗면 위에 보임
 const ON_TOP = 34
 const onDesk = (src: string, col: number, row: number, dy = 10): Furniture => ({ src, col, row, fw: 1, fh: 1, bg: 1, dy, z: ON_TOP })
 
-// 책상 위치 (책상 왼쪽 위 칸) — 1줄 비서 / 2줄 경영·마케팅 / 3줄 자금·직원·원가
+// 책상 하나 + 뒤에 의자 + 책상 위 모니터(뒷면) — 사람은 책상 뒤 가운데에 앉아 정면을 봄
+//   w: 책상 폭 (일반 책상 3칸, 안내 데스크 5칸 — 둘 다 윗면 높이가 같아 앉는 위치·소품 보정 공용)
+function deskSet(col: number, row: number, extras: Furniture[] = [], w = 3): Furniture[] {
+  const mid = col + Math.floor(w / 2)
+  return [
+    { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_FRONT.png`, col: mid, row: row - 2, fw: 1, fh: 2, bg: 1, dy: 8, z: -1 },
+    { src: w === 5 ? `${CAFE}/RECEPTION.png` : `${F}/DESK/DESK_FRONT.png`, col, row, fw: w, fh: 2, bg: 0 },
+    { src: `${F}/PC/PC_BACK.png`, col: mid + 1, row, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
+    ...extras,
+  ]
+}
+
+// 책상 위치 (책상 왼쪽 위 칸) — 일하는 곳 가운데(15.5열) 기준 좌우 대칭
 const ROW1 = 4
 const ROW2 = 9
 const ROW3 = 14
-const CAFE = '/office/cafe'
 
 export const FURNITURE: Furniture[] = [
   // ── 카페 벽: 메뉴판 · 걸이 화분 · 작은 그림
@@ -75,9 +82,10 @@ export const FURNITURE: Furniture[] = [
   { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 4, row: 11, fw: 1, fh: 2, bg: 1, z: -1, flip: true },
   { src: `${F}/COFFEE/COFFEE.png`, col: 2, row: 7, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
   { src: `${F}/COFFEE/COFFEE.png`, col: 3, row: 11, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
-  // ── 소파 자리 + 화분
-  { src: `${F}/SOFA/SOFA_FRONT.png`, col: 4, row: 14, fw: 2, fh: 1, bg: 0, z: -1 },
-  { src: `${F}/COFFEE_TABLE/COFFEE_TABLE.png`, col: 4, row: 15, fw: 2, fh: 2 },
+  // ── 마주 보는 소파 (앞모습 소파 · 테이블 · 뒷모습 소파) — 뒷모습 소파는 앉은 사람보다 앞에 그림
+  { src: `${F}/SOFA/SOFA_FRONT.png`, col: 5, row: 13, fw: 2, fh: 1, bg: 0, z: -1 },
+  { src: `${F}/COFFEE_TABLE/COFFEE_TABLE.png`, col: 5, row: 14, fw: 2, fh: 2 },
+  { src: `${F}/SOFA/SOFA_BACK.png`, col: 5, row: 16, fw: 2, fh: 1, bg: 0, z: 1 },
   { src: `${F}/LARGE_PLANT/LARGE_PLANT.png`, col: 0, row: 14, fw: 2, fh: 3, bg: 2 },
   { src: `${F}/CUSHIONED_BENCH/CUSHIONED_BENCH.png`, col: 6, row: 9, fw: 1, fh: 1 },
   { src: `${F}/POT/POT.png`, col: 3, row: 16, fw: 1, fh: 1 },
@@ -85,19 +93,19 @@ export const FURNITURE: Furniture[] = [
   { src: `${F}/PLANT_2/PLANT_2.png`, col: 7, row: 6, fw: 1, fh: 2, bg: 1 },
   { src: `${F}/CACTUS/CACTUS.png`, col: 7, row: 11, fw: 1, fh: 2, bg: 1 },
 
-  // ── 일하는 곳 벽 (비서 위에 시계)
+  // ── 일하는 곳 벽 (안내 데스크 위에 시계)
   { src: `${F}/WHITEBOARD/WHITEBOARD.png`, col: 10, row: 0, fw: 2, fh: 2, onWall: true },
   { src: `${F}/BOOKSHELF/BOOKSHELF.png`, col: 12, row: 1, fw: 2, fh: 1, onWall: true },
   { src: `${F}/CLOCK/CLOCK.png`, col: 15, row: 0, fw: 1, fh: 2, onWall: true },
   { src: `${F}/SMALL_PAINTING/SMALL_PAINTING.png`, col: 18, row: 0, fw: 1, fh: 2, onWall: true },
   { src: `${F}/LARGE_PAINTING/LARGE_PAINTING.png`, col: 20, row: 0, fw: 2, fh: 2, onWall: true },
-  // ── 1줄: 비서 (가운데)
-  ...deskSet(14, ROW1, [onDesk(`${F}/COFFEE/COFFEE.png`, 14, ROW1)]),
+  // ── 1줄: 비서 안내 데스크 (5칸)
+  ...deskSet(13, ROW1, [onDesk(`${F}/COFFEE/COFFEE.png`, 14, ROW1)], 5),
   { src: `${F}/PLANT/PLANT.png`, col: 11, row: 3, fw: 1, fh: 2, bg: 1 },
   { src: `${F}/PLANT_2/PLANT_2.png`, col: 19, row: 3, fw: 1, fh: 2, bg: 1 },
   // ── 2줄: 경영 · 마케팅
   ...deskSet(11, ROW2),
-  ...deskSet(16, ROW2, [onDesk(`${F}/COFFEE/COFFEE.png`, 16, ROW2)]),
+  ...deskSet(17, ROW2, [onDesk(`${F}/COFFEE/COFFEE.png`, 17, ROW2)]),
   // ── 3줄: 자금 관리 · 직원 관리 · 원가(빈자리)
   ...deskSet(9, ROW3),
   ...deskSet(14, ROW3, [onDesk(`${F}/COFFEE/COFFEE.png`, 14, ROW3)]),
@@ -127,22 +135,23 @@ const RUG = {
   gray: { fill: '#dedad2', edge: '#bdb7ab', dot: '#9a958b' },
 }
 
-const seatOf = (deskCol: number, deskRow: number, char: string, rug: (typeof RUG)[keyof typeof RUG]): Seat => ({
-  col: deskCol + 1,
+// deskW: 책상 폭(칸), rugW: 러그 폭(칸) — 러그는 책상 가운데 기준
+const seatOf = (deskCol: number, deskRow: number, char: string, rug: (typeof RUG)[keyof typeof RUG], rugW: number, deskW = 3): Seat => ({
+  col: deskCol + Math.floor(deskW / 2),
   row: deskRow - 1,
   char,
-  // 러그: 의자~책상을 감싸는 4칸 폭 (옆 자리와 1칸 띄움)
-  rug: { x: deskCol * TILE - 8, y: (deskRow - 2) * TILE + 2, w: 4 * TILE, h: 4 * TILE + 4, ...rug },
-  desk: { col: deskCol, row: deskRow - 2, w: 3, h: 4 },
+  rug: { x: Math.round((deskCol + deskW / 2) * TILE - (rugW * TILE) / 2), y: (deskRow - 2) * TILE + 2, w: rugW * TILE, h: 4 * TILE + 4, ...rug },
+  desk: { col: deskCol, row: deskRow - 2, w: deskW, h: 4 },
 })
 
+// 러그 폭: 안내 데스크 7칸 > 2줄 5칸 > 3줄 4칸 (윗줄일수록 넓게)
 export const SEATS: Record<string, Seat> = {
-  assistant: seatOf(14, ROW1, '/office/characters/char_4.png', RUG.green),
-  business: seatOf(11, ROW2, '/office/characters/char_0.png', RUG.blue),
-  marketing: seatOf(16, ROW2, '/office/characters/char_1.png', RUG.pink),
-  cashflow: seatOf(9, ROW3, '/office/characters/char_3.png', RUG.yellow),
-  attendance: seatOf(14, ROW3, '/office/characters/char_2.png', RUG.purple),
-  cost: seatOf(19, ROW3, '/office/characters/char_5.png', RUG.gray), // 입사 전에는 빈자리
+  assistant: seatOf(13, ROW1, '/office/characters/char_4.png', RUG.green, 7, 5),
+  business: seatOf(11, ROW2, '/office/characters/char_0.png', RUG.blue, 5),
+  marketing: seatOf(17, ROW2, '/office/characters/char_1.png', RUG.pink, 5),
+  cashflow: seatOf(9, ROW3, '/office/characters/char_3.png', RUG.yellow, 4),
+  attendance: seatOf(14, ROW3, '/office/characters/char_2.png', RUG.purple, 4),
+  cost: seatOf(19, ROW3, '/office/characters/char_5.png', RUG.gray, 4), // 입사 전에는 빈자리
 }
 
 // 책상에 앉으면 이만큼 아래로 — 책상 윗면(그림 11px)이 다리를 가리고 머리·어깨가 보이게 (책상 뒤에 앉은 모습)
@@ -152,11 +161,13 @@ export const DESK_SIT_OFFSET = 16
 export const REST_SPOTS: { col: number; row: number; sit: boolean; dir: 'down' | 'up' | 'right' | 'left' }[] = [
   { col: 1, row: 8, sit: true, dir: 'right' }, // 테이블1 왼쪽 의자
   { col: 4, row: 12, sit: true, dir: 'left' }, // 테이블2 오른쪽 의자
-  { col: 4, row: 14, sit: true, dir: 'down' }, // 소파
+  { col: 5, row: 13, sit: true, dir: 'down' }, // 소파(앞모습)
+  { col: 6, row: 16, sit: true, dir: 'up' }, // 소파(뒷모습) — 마주 봄
   { col: 1, row: 5, sit: false, dir: 'up' }, // 카운터 앞 (주문)
   { col: 4, row: 8, sit: true, dir: 'left' },
   { col: 1, row: 12, sit: true, dir: 'right' },
-  { col: 5, row: 14, sit: true, dir: 'down' },
+  { col: 6, row: 13, sit: true, dir: 'down' },
+  { col: 5, row: 16, sit: true, dir: 'up' },
   { col: 4, row: 5, sit: false, dir: 'up' },
 ]
 
