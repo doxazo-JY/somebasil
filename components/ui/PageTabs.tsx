@@ -11,6 +11,7 @@ const GROUPS: Record<GroupKey, { label: string; href: string }[]> = {
     { label: '대시보드', href: '/' },
     { label: '주간', href: '/weekly' },
     { label: '업무함', href: '/inbox' },
+    { label: '마케팅', href: '/marketing' },
   ],
   // 월말 결산 — 사장 보고/의사결정
   settlement: [

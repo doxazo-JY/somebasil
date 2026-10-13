@@ -5,8 +5,8 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/agents/business",
-      "schedule": "0 23 * * 2"
+      "path": "/api/cron/agents",
+      "schedule": "0 23 * * *"
     }
   ]
 }

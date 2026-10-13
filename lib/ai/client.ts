@@ -90,25 +90,27 @@ export async function generateStructured<S extends z.ZodType>(opts: {
   }
 }
 
-export type AgentKey = 'business' | 'marketing'
+export type AgentKey = 'business' | 'marketing' | 'attendance' | 'cashflow'
 
 export const AGENT_LABEL: Record<AgentKey, string> = {
   business: '경영 AI',
   marketing: '마케팅 AI',
+  attendance: '근태 AI',
+  cashflow: '현금흐름 AI',
 }
 
 export type RunTrigger = 'schedule' | 'manual'
 
-type RunResult = {
+type RunResult<T> = {
   summary: string
-  output: unknown
+  output: T
   period?: string | null
   usage?: { input_tokens: number; output_tokens: number } | null
-  model?: string
+  model?: string | null
 }
 
 // 실행 1회를 ai_runs에 기록하며 감쌈 — 실패해도 기록이 남음
-export async function recordRun(agent: AgentKey, trigger: RunTrigger, work: (runId: number) => Promise<RunResult>) {
+export async function recordRun<T>(agent: AgentKey, trigger: RunTrigger, work: (runId: number) => Promise<RunResult<T>>) {
   const supabase = createServerClient()
   const { data: run, error } = await supabase
     .from('ai_runs')

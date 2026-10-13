@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { InboxItem } from '@/lib/supabase/queries/ai'
 
-const AGENT_LABEL: Record<string, string> = { business: '경영 AI', marketing: '마케팅 AI' }
+const AGENT_LABEL: Record<string, string> = { business: '경영 AI', marketing: '마케팅 AI', attendance: '근태 AI', cashflow: '현금흐름 AI' }
 
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short' }).format(new Date(iso))
@@ -32,7 +33,7 @@ export default function InboxList({ open, closed }: { open: InboxItem[]; closed:
       {open.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-gray-200 px-6 py-12 text-center">
           <p className="text-sm font-semibold text-gray-700">챙길 일이 없어요</p>
-          <p className="text-xs text-gray-400 mt-1 [word-break:keep-all]">경영 AI는 매주 수요일 아침에 지난주를 점검해서 꼭 볼 것만 여기에 올려요</p>
+          <p className="text-xs text-gray-400 mt-1 [word-break:keep-all]">AI 업무팀이 매일 아침 점검해서 챙길 일이 있을 때만 여기에 올려요</p>
         </div>
       ) : (
         open.map((item) => (
@@ -66,6 +67,11 @@ export default function InboxList({ open, closed }: { open: InboxItem[]; closed:
               </div>
             )}
             <div className="flex justify-end gap-2">
+              {item.link && (
+                <Link href={item.link} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 mr-auto">
+                  바로 가기 →
+                </Link>
+              )}
               <button
                 onClick={() => setStatus(item.id, 'dismissed')}
                 disabled={busyId === item.id}
