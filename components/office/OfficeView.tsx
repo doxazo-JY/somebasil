@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { AiRun, InboxItem } from '@/lib/supabase/queries/ai'
 import InboxList from '@/components/inbox/InboxList'
 import PixelDesk from './PixelDesk'
+import AssistantChat from './AssistantChat'
 import { OFFICE_AGENTS, type OfficeAgent } from './agents'
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
   runs: AiRun[]
   today: string // 한국 날짜
   configProblem: string | null
+  assistantHistory: { q: string; a: string }[]
 }
 
 const kstDay = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(iso))
@@ -24,6 +26,7 @@ type DeskState = { label: string; cls: string; screenOn: boolean }
 
 function deskState(agent: OfficeAgent, last: AiRun | undefined, today: string): DeskState {
   if (agent.vacant) return { label: '입사 예정', cls: 'border border-dashed border-[#8a8370] text-[#6d6656]', screenOn: false }
+  if (agent.chat) return { label: '질문 받는 중', cls: 'bg-white text-[#1a5c3a] border border-[#1a5c3a]/40', screenOn: true }
   if (last?.status === 'running') return { label: '작업 중', cls: 'bg-[#1a5c3a] text-white', screenOn: true }
   if (last?.status === 'failed') return { label: '실패', cls: 'bg-red-500 text-white', screenOn: false }
   if (last && kstDay(last.started_at) === today) return { label: '오늘 점검', cls: 'bg-white text-[#1a5c3a] border border-[#1a5c3a]/40', screenOn: true }
@@ -31,7 +34,7 @@ function deskState(agent: OfficeAgent, last: AiRun | undefined, today: string): 
 }
 
 // AI 사무실 — 책상을 누르면 그 AI의 업무함만
-export default function OfficeView({ open, closed, runs, today, configProblem }: Props) {
+export default function OfficeView({ open, closed, runs, today, configProblem, assistantHistory }: Props) {
   const lastRun = (key: string) => runs.find((r) => r.agent === key)
   const openOf = (key: string) => open.filter((i) => i.agent === key)
 
@@ -88,7 +91,9 @@ export default function OfficeView({ open, closed, runs, today, configProblem }:
       </div>
 
       <AgentDetail
+        key={agent.key}
         agent={agent}
+        assistantHistory={assistantHistory}
         last={lastRun(agent.key)}
         runs={runs.filter((r) => r.agent === agent.key).slice(0, 5)}
         open={openOf(agent.key)}
@@ -99,8 +104,9 @@ export default function OfficeView({ open, closed, runs, today, configProblem }:
   )
 }
 
-function AgentDetail({ agent, last, runs, open, closed, configProblem }: {
+function AgentDetail({ agent, assistantHistory, last, runs, open, closed, configProblem }: {
   agent: OfficeAgent
+  assistantHistory: { q: string; a: string }[]
   last: AiRun | undefined
   runs: AiRun[]
   open: InboxItem[]
@@ -126,6 +132,18 @@ function AgentDetail({ agent, last, runs, open, closed, configProblem }: {
     setRunning(false)
     if (!res.ok) setError(data.error ?? '실행하지 못했어요')
     router.refresh()
+  }
+
+  if (agent.chat) {
+    return (
+      <div className="space-y-3">
+        <div className="bg-white rounded-xl border border-gray-100 px-5 py-4">
+          <p className="text-base font-semibold text-gray-900">{agent.name}</p>
+          <p className="text-xs text-gray-500 mt-0.5 [word-break:keep-all]">{agent.role} 기록을 바꾸지는 못하고 찾아보기만 해요.</p>
+        </div>
+        <AssistantChat initial={assistantHistory} disabledReason={configProblem} />
+      </div>
+    )
   }
 
   if (agent.vacant) {

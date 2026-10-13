@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { InboxItem } from '@/lib/supabase/queries/ai'
 
-const AGENT_LABEL: Record<string, string> = { business: '경영 AI', marketing: '마케팅 AI', attendance: '근태 AI', cashflow: '현금흐름 AI' }
+const AGENT_LABEL: Record<string, string> = { business: '경영 AI', marketing: '마케팅 AI', attendance: '직원 관리 AI', cashflow: '자금 관리 AI', assistant: '비서 AI' }
 
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short' }).format(new Date(iso))

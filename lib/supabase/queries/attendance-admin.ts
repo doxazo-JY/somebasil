@@ -168,7 +168,7 @@ export type Timesheet = {
 }
 
 // 근무 한 건 (출처 무관 공통 형태)
-type Shift = {
+export type Shift = {
   staff_id: number
   name: string
   work_date: string
@@ -344,4 +344,11 @@ export async function firstTimesheetMonth(): Promise<{ year: number; month: numb
   if (candidates.length === 0) return null
   const [y, m] = candidates.sort()[0].split('-').map(Number)
   return { year: y, month: m }
+}
+
+// 기간 안의 알바생 근무 (QR 기록 시작일 기준으로 종이/QR 합침) — 비서 AI 근무시간 조회용
+export async function getShiftsBetween(start: string, endExclusive: string): Promise<Shift[]> {
+  const [rates, qrStart] = await Promise.all([getPayRates(), getQrStartDate()])
+  const [paper, qr] = await Promise.all([paperShifts(start, endExclusive, qrStart), qrShifts(start, endExclusive, qrStart, rates)])
+  return [...paper, ...qr]
 }

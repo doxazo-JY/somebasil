@@ -4,7 +4,7 @@ import { fetchAllRows } from '@/lib/supabase/fetchAll'
 import { kstDate } from '@/lib/attendance/tokens'
 import { generateStructured, recordRun, type RunTrigger } from '../client'
 
-// 현금흐름 AI — 매주 월요일 아침. 통장 거래(입금·출금)로 앞으로 30일 동안 잔고가 부족해질 위험을 미리 알림
+// 자금 관리 AI (내부 키 cashflow) — 매주 월요일 아침. 통장 거래(입금·출금)로 앞으로 30일 동안 잔고가 부족해질 위험을 미리 알림
 // AI에 원본 거래를 다 보내지 않고 요약해서 보냄: 현재 잔고 · 최근 90일 일별 입출금 · 반복 지출(매달 나가는 돈) · 큰 지출
 // 위험이 없으면 업무함에 아무것도 올리지 않음
 
@@ -23,7 +23,7 @@ const OutputSchema = z.object({
   alerts: z.array(AlertSchema).describe('실제 위험이 있을 때만 0~2개. 문제가 없으면 빈 배열'),
 })
 
-const SYSTEM = `당신은 카페 "썸바실"의 현금흐름 담당 AI입니다. 통장 거래 데이터를 보고, 앞으로 30일 안에 통장 잔고가 부족해지거나 큰 지출이 몰리는 위험을 점장에게 미리 알립니다.
+const SYSTEM = `당신은 카페 "썸바실"의 자금 관리 담당 AI입니다. 통장 거래 데이터를 보고, 앞으로 30일 안에 통장 잔고가 부족해지거나 큰 지출이 몰리는 위험을 점장에게 미리 알립니다.
 
 점장과 대표 모두 경영 경험이 많지 않습니다. 쉬운 말로, 근거 숫자와 함께, 이번 주에 할 수 있는 행동으로 씁니다.
 

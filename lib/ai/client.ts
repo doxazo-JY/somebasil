@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import OpenAI from 'openai'
 import { zodResponseFormat } from 'openai/helpers/zod'
-import type { z } from 'zod'
+import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 
 // AI 업무팀 공통 — AI 호출 + 실행 기록(ai_runs). 서버 전용
@@ -90,13 +90,145 @@ export async function generateStructured<S extends z.ZodType>(opts: {
   }
 }
 
-export type AgentKey = 'business' | 'marketing' | 'attendance' | 'cashflow'
+// ─────────────────────────────────────────────
+// 도구 쓰는 대화 (비서 AI) — AI가 필요한 조회 도구를 골라 부르고, 결과를 보고 답함
+// 도구는 모두 조회 전용. 최대 MAX_TOOL_ROUNDS번 왕복
+// ─────────────────────────────────────────────
+
+export type AiTool = {
+  name: string
+  description: string
+  schema: z.ZodObject<z.ZodRawShape>
+  run: (input: Record<string, unknown>) => Promise<unknown>
+}
+
+type ChatTurn = { role: 'user' | 'assistant'; content: string }
+
+const MAX_TOOL_ROUNDS = 6
+const MAX_TOOL_RESULT_CHARS = 20000
+
+function toolJsonSchema(schema: z.ZodObject<z.ZodRawShape>) {
+  const { $schema, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>
+  void $schema
+  return rest
+}
+
+async function callTool(tools: AiTool[], name: string, rawInput: unknown) {
+  const tool = tools.find((t) => t.name === name)
+  if (!tool) return { error: `없는 도구: ${name}` }
+  const parsed = tool.schema.safeParse(rawInput)
+  if (!parsed.success) return { error: `입력이 올바르지 않음: ${parsed.error.message}` }
+  try {
+    return await tool.run(parsed.data)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : '조회 실패' }
+  }
+}
+
+const stringifyResult = (v: unknown) => JSON.stringify(v).slice(0, MAX_TOOL_RESULT_CHARS)
+
+export async function runToolChat(opts: { system: string; turns: ChatTurn[]; tools: AiTool[] }): Promise<{
+  text: string
+  toolsUsed: string[]
+  model: string
+  usage: { input_tokens: number; output_tokens: number }
+}> {
+  const problem = aiConfigProblem()
+  if (problem) throw new Error(problem)
+  const toolsUsed: string[] = []
+  const usage = { input_tokens: 0, output_tokens: 0 }
+
+  if (aiProvider() === 'openai') {
+    // 추론 모델의 도구 호출은 Responses API만 지원 (Chat Completions는 400)
+    // store:false — OpenAI 쪽에 대화를 남기지 않음. 대신 추론 내용을 암호화된 형태로 받아 다음 왕복에 그대로 돌려줌
+    openaiClient ??= new OpenAI()
+    const input: OpenAI.Responses.ResponseInputItem[] = opts.turns.map((t) => ({ role: t.role, content: t.content }))
+    const tools: OpenAI.Responses.FunctionTool[] = opts.tools.map((t) => ({
+      type: 'function',
+      name: t.name,
+      description: t.description,
+      parameters: toolJsonSchema(t.schema),
+      strict: false,
+    }))
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const response = await openaiClient.responses.create({
+        model: process.env.OPENAI_MODEL!,
+        instructions: opts.system,
+        input,
+        tools,
+        store: false,
+        include: ['reasoning.encrypted_content'],
+        ...(round === MAX_TOOL_ROUNDS ? { tool_choice: 'none' as const } : {}),
+      })
+      usage.input_tokens += response.usage?.input_tokens ?? 0
+      usage.output_tokens += response.usage?.output_tokens ?? 0
+      const calls = response.output.filter((o): o is OpenAI.Responses.ResponseFunctionToolCall => o.type === 'function_call')
+      if (calls.length === 0) return { text: response.output_text ?? '', toolsUsed, model: response.model, usage }
+      // 추론·도구 호출 항목을 그대로 이어 붙인 뒤 결과 추가
+      input.push(...(response.output as OpenAI.Responses.ResponseInputItem[]))
+      for (const call of calls) {
+        toolsUsed.push(call.name)
+        let args: unknown = {}
+        try {
+          args = JSON.parse(call.arguments || '{}')
+        } catch {
+          args = {}
+        }
+        const result = await callTool(opts.tools, call.name, args)
+        input.push({ type: 'function_call_output', call_id: call.call_id, output: stringifyResult(result) })
+      }
+    }
+    throw new Error('조회를 너무 많이 반복해서 멈췄습니다')
+  }
+
+  anthropicClient ??= new Anthropic()
+  const messages: Anthropic.Beta.BetaMessageParam[] = opts.turns.map((t) => ({ role: t.role, content: t.content }))
+  const tools: Anthropic.Beta.BetaTool[] = opts.tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: toolJsonSchema(t.schema) as Anthropic.Beta.BetaTool['input_schema'],
+  }))
+  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    const response = await anthropicClient.beta.messages.create({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 8000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium' },
+      system: opts.system,
+      messages,
+      tools,
+      ...(round === MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' as const } } : {}),
+    })
+    usage.input_tokens += response.usage.input_tokens
+    usage.output_tokens += response.usage.output_tokens
+    if (response.stop_reason === 'refusal') throw new Error('AI가 요청을 거절했습니다 (refusal)')
+    const calls = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use')
+    if (response.stop_reason !== 'tool_use' || calls.length === 0) {
+      const text = response.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').map((b) => b.text).join('\n')
+      return { text, toolsUsed, model: response.model, usage }
+    }
+    // 생각 블록 포함 응답 전체를 그대로 이어 붙임
+    messages.push({ role: 'assistant', content: response.content })
+    const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
+    for (const call of calls) {
+      toolsUsed.push(call.name)
+      const result = await callTool(opts.tools, call.name, call.input)
+      results.push({ type: 'tool_result', tool_use_id: call.id, content: stringifyResult(result) })
+    }
+    messages.push({ role: 'user', content: results })
+  }
+  throw new Error('조회를 너무 많이 반복해서 멈췄습니다')
+}
+
+export type AgentKey = 'business' | 'marketing' | 'attendance' | 'cashflow' | 'assistant'
 
 export const AGENT_LABEL: Record<AgentKey, string> = {
   business: '경영 AI',
   marketing: '마케팅 AI',
-  attendance: '근태 AI',
-  cashflow: '현금흐름 AI',
+  attendance: '직원 관리 AI',
+  cashflow: '자금 관리 AI',
+  assistant: '비서 AI',
 }
 
 export type RunTrigger = 'schedule' | 'manual'

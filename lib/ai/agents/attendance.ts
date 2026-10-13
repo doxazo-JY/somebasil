@@ -4,7 +4,7 @@ import { fmtWorkDate } from '@/lib/attendance/format'
 import { getPayRates, rateFor } from '@/lib/supabase/queries/attendance-admin'
 import { recordRun, type RunTrigger } from '../client'
 
-// 근태 AI — 매일 아침. AI 호출 없이 규칙으로 점검 (비용 0)
+// 직원 관리 AI (내부 키 attendance) — 매일 아침. AI 호출 없이 규칙으로 점검 (비용 0)
 //   1) 퇴근 누락: 출근 후 16시간이 지나도 퇴근 기록 없는 QR 기록
 //   2) 주휴수당 대상: 알바생이 한 주(월~일) QR 근무 15시간 이상 — 이번 주·지난주
 // 같은 알림은 dedupe_key로 한 번만 올림

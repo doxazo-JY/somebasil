@@ -78,6 +78,22 @@ export async function getMarketingPosts(limit = 40): Promise<{ topic: string; so
   return [...groups.values()]
 }
 
+// 비서 AI 최근 질문·답 (사무실 대화창에 이어서 보여줌)
+export async function getAssistantHistory(limit = 6): Promise<{ q: string; a: string; at: string }[]> {
+  const supabase = createServerClient()
+  const { data } = await supabase
+    .from('ai_runs')
+    .select('output, started_at')
+    .eq('agent', 'assistant')
+    .eq('status', 'succeeded')
+    .order('started_at', { ascending: false })
+    .limit(limit)
+  return (data ?? [])
+    .map((r) => ({ q: (r.output as { question?: string })?.question ?? '', a: (r.output as { answer?: string })?.answer ?? '', at: r.started_at as string }))
+    .filter((x) => x.q && x.a)
+    .reverse()
+}
+
 export async function getRecentRuns(limit = 10): Promise<AiRun[]> {
   const supabase = createServerClient()
   const { data, error } = await supabase
