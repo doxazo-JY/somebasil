@@ -26,7 +26,7 @@ const fmtDateTime = (iso: string) =>
 // 작업 중(타이핑) / 확인 기다림(자리에서 서류) / 쉬는 중(쉬는 곳) — 그림의 모습과 같은 말로
 function chipOf(agent: OfficeAgent, last: AiRun | undefined, today: string, running: boolean, items: number): { label: string; cls: string } {
   if (agent.vacant) return { label: '입사 예정', cls: 'text-[#8a8370]' }
-  if (agent.chat) return { label: running ? '답하는 중' : '질문 받는 중', cls: 'text-[#1a5c3a]' }
+  if (agent.chat) return running ? { label: '답하는 중', cls: 'text-[#1a5c3a]' } : { label: '질문 기다림', cls: 'text-[#6d6656]' }
   if (running) return { label: '작업 중', cls: 'text-[#1a5c3a]' }
   if (last?.status === 'failed') return { label: '실패', cls: 'text-red-600' }
   if (items > 0) return { label: '확인 기다림', cls: 'text-[#9a5b00]' }
@@ -62,8 +62,8 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
       key: a.key,
       name: a.name,
       vacant: !!a.vacant,
-      // 실행 중 → 책상에서 타이핑 / 확인할 일 있음·비서 → 책상에서 읽기 / 그 외 → 쉬는 곳
-      mode: running ? 'type' : items.length > 0 || a.chat ? 'read' : 'rest',
+      // 실행 중 → 책상에서 타이핑 / 확인할 일 있음 → 책상에서 읽기 / 그 외 → 카페에서 쉼 (비서도 질문이 오면 자리로)
+      mode: running ? 'type' : items.length > 0 ? 'read' : 'rest',
       chip: chipOf(a, lastRun(a.key), today, running, items.length),
       items: items.length,
       warn: items.some((i) => i.severity === 'warn'),
