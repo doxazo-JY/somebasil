@@ -13,7 +13,11 @@ const EXAMPLES = [
 ]
 
 // 비서 AI 대화창 — 질문 → 데이터 조회 → 답 (최근 대화 이어서 묻기 가능)
-export default function AssistantChat({ initial, disabledReason }: { initial: { q: string; a: string }[]; disabledReason: string | null }) {
+export default function AssistantChat({ initial, disabledReason, onBusyChange }: {
+  initial: { q: string; a: string }[]
+  disabledReason: string | null
+  onBusyChange?: (busy: boolean) => void // 사무실 그림에서 비서가 타이핑하도록
+}) {
   const [turns, setTurns] = useState<Turn[]>(initial)
   const [question, setQuestion] = useState('')
   const [busy, setBusy] = useState(false)
@@ -30,6 +34,7 @@ export default function AssistantChat({ initial, disabledReason }: { initial: { 
     setTurns((prev) => [...prev, { q, a: null }])
     setQuestion('')
     setBusy(true)
+    onBusyChange?.(true)
     const res = await fetch('/api/ai/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -37,6 +42,7 @@ export default function AssistantChat({ initial, disabledReason }: { initial: { 
     }).catch(() => null)
     const data = res ? await res.json().catch(() => ({})) : {}
     setBusy(false)
+    onBusyChange?.(false)
     setTurns((prev) => {
       const next = [...prev]
       next[next.length - 1] = res?.ok ? { q, a: data.answer } : { q, a: null, error: data.error ?? '답을 받지 못했어요. 다시 물어봐 주세요.' }

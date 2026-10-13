@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { AiRun, InboxItem } from '@/lib/supabase/queries/ai'
 import InboxList from '@/components/inbox/InboxList'
-import PixelDesk from './PixelDesk'
+import OfficeScene, { type SceneAgent } from './scene/OfficeScene'
 import AssistantChat from './AssistantChat'
 import { OFFICE_AGENTS, type OfficeAgent } from './agents'
 
@@ -22,18 +22,17 @@ const kstDay = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'As
 const fmtDateTime = (iso: string) =>
   new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso))
 
-type DeskState = { label: string; cls: string; screenOn: boolean }
-
-function deskState(agent: OfficeAgent, last: AiRun | undefined, today: string): DeskState {
-  if (agent.vacant) return { label: '입사 예정', cls: 'border border-dashed border-[#8a8370] text-[#6d6656]', screenOn: false }
-  if (agent.chat) return { label: '질문 받는 중', cls: 'bg-white text-[#1a5c3a] border border-[#1a5c3a]/40', screenOn: true }
-  if (last?.status === 'running') return { label: '작업 중', cls: 'bg-[#1a5c3a] text-white', screenOn: true }
-  if (last?.status === 'failed') return { label: '실패', cls: 'bg-red-500 text-white', screenOn: false }
-  if (last && kstDay(last.started_at) === today) return { label: '오늘 점검', cls: 'bg-white text-[#1a5c3a] border border-[#1a5c3a]/40', screenOn: true }
-  return { label: '대기', cls: 'bg-white text-[#5d6a63] border border-[#c9c2ae]', screenOn: false }
+// 상태 표시 (이름표 옆 글자 색)
+function chipOf(agent: OfficeAgent, last: AiRun | undefined, today: string, running: boolean): { label: string; cls: string } {
+  if (agent.vacant) return { label: '입사 예정', cls: 'text-[#8a8370]' }
+  if (agent.chat) return { label: running ? '답하는 중' : '질문 받는 중', cls: 'text-[#1a5c3a]' }
+  if (running || last?.status === 'running') return { label: '작업 중', cls: 'text-[#1a5c3a]' }
+  if (last?.status === 'failed') return { label: '실패', cls: 'text-red-600' }
+  if (last && kstDay(last.started_at) === today) return { label: '오늘 점검', cls: 'text-[#1a5c3a]' }
+  return { label: '대기', cls: 'text-[#6d6656]' }
 }
 
-// AI 사무실 — 책상을 누르면 그 AI의 업무함만
+// AI 사무실 — 캐릭터(또는 책상)를 누르면 그 AI의 업무함만
 export default function OfficeView({ open, closed, runs, today, configProblem, assistantHistory }: Props) {
   const lastRun = (key: string) => runs.find((r) => r.agent === key)
   const openOf = (key: string) => open.filter((i) => i.agent === key)
@@ -44,50 +43,39 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
     [...OFFICE_AGENTS].filter((a) => openOf(a.key).length > 0).sort((a, b) => openOf(b.key).length - openOf(a.key).length)[0] ??
     OFFICE_AGENTS[0]
   const [selected, setSelected] = useState(initial.key)
+  const [runningKey, setRunningKey] = useState<string | null>(null) // [지금 점검] 누른 AI (경영 점검 중엔 마케팅도)
+  const [assistantBusy, setAssistantBusy] = useState(false)
   const agent = OFFICE_AGENTS.find((a) => a.key === selected) ?? OFFICE_AGENTS[0]
 
-  // 넓은 화면: 왼쪽 사무실(스크롤해도 고정) + 오른쪽 선택한 AI의 메시지 / 폰: 위아래
+  const isRunning = (key: string) =>
+    lastRun(key)?.status === 'running' ||
+    runningKey === key ||
+    (runningKey === 'business' && key === 'marketing') ||
+    (key === 'assistant' && assistantBusy)
+
+  const sceneAgents: SceneAgent[] = OFFICE_AGENTS.map((a) => {
+    const items = openOf(a.key)
+    const running = isRunning(a.key)
+    return {
+      key: a.key,
+      name: a.name,
+      vacant: !!a.vacant,
+      // 실행 중 → 책상에서 타이핑 / 확인할 일 있음·비서 → 책상에서 읽기 / 그 외 → 라운지
+      mode: running ? 'type' : items.length > 0 || a.chat ? 'read' : 'rest',
+      chip: chipOf(a, lastRun(a.key), today, running),
+      items: items.length,
+      warn: items.some((i) => i.severity === 'warn'),
+    }
+  })
+
+  // 넓은 화면: 왼쪽 사무실(스크롤해도 고정) + 오른쪽 선택한 AI / 폰: 위아래
   return (
-    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-6 lg:items-start">
-      {/* 사무실 — 고정 팔레트 픽셀 일러스트 */}
-      <div
-        className="rounded-xl border border-gray-100 overflow-hidden lg:sticky lg:top-6"
-        style={{
-          backgroundColor: '#efe8d6',
-          backgroundImage:
-            'linear-gradient(45deg, #e6dcc4 25%, transparent 25%, transparent 75%, #e6dcc4 75%), linear-gradient(45deg, #e6dcc4 25%, transparent 25%, transparent 75%, #e6dcc4 75%)',
-          backgroundSize: '24px 24px',
-          backgroundPosition: '0 0, 12px 12px',
-        }}
-      >
-        <div className="h-3 bg-[#d6e3da] border-b-4 border-[#b4c7ba]" />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-5 px-4 py-5">
-          {OFFICE_AGENTS.map((a) => {
-            const items = openOf(a.key)
-            const warn = items.some((i) => i.severity === 'warn')
-            const state = deskState(a, lastRun(a.key), today)
-            const isSel = a.key === selected
-            return (
-              <button
-                key={a.key}
-                onClick={() => setSelected(a.key)}
-                aria-pressed={isSel}
-                className={`flex flex-col items-center gap-1.5 rounded-lg py-2 transition-colors ${isSel ? 'bg-white/70 ring-2 ring-[#1a5c3a]' : 'hover:bg-white/40'}`}
-              >
-                <span
-                  className={`text-[11px] px-2 py-0.5 border-2 min-h-[24px] whitespace-nowrap ${
-                    items.length === 0 ? 'invisible' : warn ? 'bg-[#fff1a8] border-[#9a5b00] text-[#6b4400]' : 'bg-white border-[#2a2a2a] text-[#2a2a2a]'
-                  }`}
-                >
-                  챙길 일 {items.length}
-                </span>
-                <PixelDesk shirt={a.shirt} hair={a.hair} screenOn={state.screenOn} vacant={!!a.vacant} />
-                <span className="text-[13px] font-semibold text-[#2a2a2a]">{a.name}</span>
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${state.cls}`}>{state.label}</span>
-              </button>
-            )
-          })}
-        </div>
+    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
+      <div className="rounded-xl border border-gray-100 overflow-hidden lg:sticky lg:top-6 bg-[#e9e2d0]">
+        <OfficeScene agents={sceneAgents} selected={selected} onSelect={setSelected} />
+        <p className="px-3 py-1.5 text-[10px] text-gray-400 text-right bg-white/60">
+          그림: Pixel Agents (MIT) · MetroCity (CC0)
+        </p>
       </div>
 
       <AgentDetail
@@ -99,13 +87,17 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
         open={openOf(agent.key)}
         closed={closed.filter((i) => i.agent === agent.key)}
         configProblem={configProblem}
+        onRunning={(on) => setRunningKey(on ? agent.key : null)}
+        onAssistantBusy={setAssistantBusy}
       />
     </div>
   )
 }
 
-function AgentDetail({ agent, assistantHistory, last, runs, open, closed, configProblem }: {
+function AgentDetail({ agent, assistantHistory, last, runs, open, closed, configProblem, onRunning, onAssistantBusy }: {
   agent: OfficeAgent
+  onRunning: (on: boolean) => void
+  onAssistantBusy: (busy: boolean) => void
   assistantHistory: { q: string; a: string }[]
   last: AiRun | undefined
   runs: AiRun[]
@@ -122,6 +114,7 @@ function AgentDetail({ agent, assistantHistory, last, runs, open, closed, config
   async function run() {
     if (!agent.run) return
     setRunning(true)
+    onRunning(true)
     setError(null)
     const res = await fetch('/api/ai/run', {
       method: 'POST',
@@ -130,6 +123,7 @@ function AgentDetail({ agent, assistantHistory, last, runs, open, closed, config
     })
     const data = await res.json().catch(() => ({}))
     setRunning(false)
+    onRunning(false)
     if (!res.ok) setError(data.error ?? '실행하지 못했어요')
     router.refresh()
   }
@@ -141,7 +135,7 @@ function AgentDetail({ agent, assistantHistory, last, runs, open, closed, config
           <p className="text-base font-semibold text-gray-900">{agent.name}</p>
           <p className="text-xs text-gray-500 mt-0.5 [word-break:keep-all]">{agent.role} 기록을 바꾸지는 못하고 찾아보기만 해요.</p>
         </div>
-        <AssistantChat initial={assistantHistory} disabledReason={configProblem} />
+        <AssistantChat initial={assistantHistory} disabledReason={configProblem} onBusyChange={onAssistantBusy} />
       </div>
     )
   }
