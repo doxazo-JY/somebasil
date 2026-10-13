@@ -5,7 +5,7 @@ import { createServerClient } from '../server'
 export type InboxItem = {
   id: number
   agent: string
-  kind: 'insight' | 'alert' | 'draft'
+  kind: 'insight' | 'alert' | 'draft' | 'question'
   severity: 'info' | 'warn'
   title: string
   body: string
@@ -13,6 +13,9 @@ export type InboxItem = {
   action: string | null
   period: string | null
   link: string | null
+  meta: Record<string, unknown> | null // 원가 AI 질문 대상
+  answer: string | null // 질문에 점장이 적은 답
+  proposal: Record<string, unknown> | null // 답을 정리한 저장안
   status: 'new' | 'done' | 'dismissed'
   created_at: string
 }
@@ -34,7 +37,7 @@ export type AiRun = {
 // 처리 전 항목 전부 + 최근 처리한 항목 일부
 export async function getInbox(): Promise<{ open: InboxItem[]; closed: InboxItem[] }> {
   const supabase = createServerClient()
-  const cols = 'id, agent, kind, severity, title, body, evidence, action, period, link, status, created_at'
+  const cols = 'id, agent, kind, severity, title, body, evidence, action, period, link, meta, answer, proposal, status, created_at'
   const [{ data: open, error }, { data: closed }] = await Promise.all([
     supabase.from('ai_inbox').select(cols).eq('status', 'new').order('created_at', { ascending: false }),
     supabase.from('ai_inbox').select(cols).neq('status', 'new').order('resolved_at', { ascending: false }).limit(20),

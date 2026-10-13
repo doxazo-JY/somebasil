@@ -4,8 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { InboxItem } from '@/lib/supabase/queries/ai'
+import CostQuestion from './CostQuestion'
 
-const AGENT_LABEL: Record<string, string> = { business: '경영 AI', marketing: '마케팅 AI', attendance: '직원 관리 AI', cashflow: '자금 관리 AI', assistant: '비서 AI' }
+const AGENT_LABEL: Record<string, string> = { business: '경영 AI', marketing: '마케팅 AI', attendance: '직원 관리 AI', cashflow: '자금 관리 AI', assistant: '비서 AI', cost: '원가 AI' }
 
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short' }).format(new Date(iso))
@@ -65,7 +66,8 @@ export default function InboxList({ open, closed, hideAgent = false, emptyText =
                 ))}
               </dl>
             )}
-            {item.action && (
+            {item.kind === 'question' && <CostQuestion item={item} />}
+            {item.action && item.kind !== 'question' && (
               <div className="rounded-lg border border-[#1a5c3a]/20 bg-[#f4f9f6] px-3 py-2">
                 <p className="text-[11px] font-semibold text-[#1a5c3a]">할 일</p>
                 <p className="text-sm text-gray-800 [word-break:keep-all]">{item.action}</p>
@@ -82,8 +84,9 @@ export default function InboxList({ open, closed, hideAgent = false, emptyText =
                 disabled={busyId === item.id}
                 className="text-xs px-3 py-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-50"
               >
-                숨기기
+                {item.kind === 'question' ? '나중에' : '숨기기'}
               </button>
+              {item.kind !== 'question' && (
               <button
                 onClick={() => setStatus(item.id, 'done')}
                 disabled={busyId === item.id}
@@ -91,6 +94,7 @@ export default function InboxList({ open, closed, hideAgent = false, emptyText =
               >
                 확인 완료
               </button>
+              )}
             </div>
           </article>
         ))

@@ -36,7 +36,7 @@
 - `/inbox` — AI 사무실 (= 업무함). 픽셀 책상 = AI 업무팀, 책상 누르면 그 AI의 ai_inbox 항목만. 탭 이름 "사무실"
 - `/marketing` — 마케팅 AI 초안 (초안 → 승인 → 복사 → 올렸어요). 자동 게시 없음
 
-**AI 업무팀** (`lib/ai/`, 10/14): `generateStructured()`가 AI_PROVIDER(openai | anthropic)로 호출. 일정 = `/api/cron/agents` 매일 08:00 KST — 매일 근태(규칙, AI 없음) / 월 현금흐름 / 수 경영 → 마케팅(경영 AI의 marketing_topic 전달). 실행마다 ai_runs 기록. AI에 직원 이름 보내지 않음 (현금흐름은 인건비를 "직원 급여"로 묶음). 마케팅 말투 = `marketing.ts`의 실제 게시글 예시 + 승인한 글
+**AI 업무팀** (`lib/ai/`, 10/14): `generateStructured()`가 AI_PROVIDER(openai | anthropic)로 호출. 일정 = `/api/cron/agents` 매일 08:00 KST — 매일 근태(규칙, AI 없음) / 월 현금흐름·원가 / 수 경영 → 마케팅(경영 AI의 marketing_topic 전달). 비서 AI = 질문할 때 (읽기 전용 도구). 원가 AI(10/15) = 원가 계산이 막힌 곳(단가·수제 배합·레시피)을 규칙으로 찾아 영향 큰 순서로 처리 전 질문 최대 3개(ai_inbox kind=question) → 점장 답 → AI가 저장안 정리(`lib/ai/cost/answer.ts`) → 점장 [이대로 저장]을 눌러야 DB 저장. 마이그레이션 `20261015_cost_ai.sql` 실행마다 ai_runs 기록. AI에 직원 이름 보내지 않음 (현금흐름은 인건비를 "직원 급여"로 묶음). 마케팅 말투 = `marketing.ts`의 실제 게시글 예시 + 승인한 글
 
 **결산** (월말/분기):
 - `/profit` — 손익 (YTD)

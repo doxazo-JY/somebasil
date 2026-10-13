@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runWeeklyAgents } from '@/lib/ai/agents/weekly'
 import { runCashflowAgent } from '@/lib/ai/agents/cashflow'
 import { runAttendanceAgent } from '@/lib/ai/agents/attendance'
+import { runCostAgent } from '@/lib/ai/agents/cost'
 
 // 업무함 [지금 점검하기] — 관리 화면 로그인 대상
-// body: { agent: 'weekly' | 'cashflow' | 'attendance' }
+// body: { agent: 'weekly' | 'cashflow' | 'attendance' | 'cost' }
 //   weekly = 경영 AI → 마케팅 AI (자동 일정과 같은 묶음)
 export const maxDuration = 300
 
@@ -12,6 +13,7 @@ const RUNNERS = {
   weekly: () => runWeeklyAgents('manual'),
   cashflow: () => runCashflowAgent('manual'),
   attendance: () => runAttendanceAgent('manual'),
+  cost: () => runCostAgent('manual'),
 } as const
 
 export async function POST(req: NextRequest) {

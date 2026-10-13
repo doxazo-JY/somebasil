@@ -221,7 +221,7 @@ export async function runToolChat(opts: { system: string; turns: ChatTurn[]; too
   throw new Error('조회를 너무 많이 반복해서 멈췄습니다')
 }
 
-export type AgentKey = 'business' | 'marketing' | 'attendance' | 'cashflow' | 'assistant'
+export type AgentKey = 'business' | 'marketing' | 'attendance' | 'cashflow' | 'assistant' | 'cost'
 
 export const AGENT_LABEL: Record<AgentKey, string> = {
   business: '경영 AI',
@@ -229,6 +229,7 @@ export const AGENT_LABEL: Record<AgentKey, string> = {
   attendance: '직원 관리 AI',
   cashflow: '자금 관리 AI',
   assistant: '비서 AI',
+  cost: '원가 AI',
 }
 
 export type RunTrigger = 'schedule' | 'manual'
