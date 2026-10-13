@@ -56,9 +56,16 @@ export async function runCashflowAgent(trigger: RunTrigger, now = new Date()) {
       ),
     ])
 
+    // 인건비는 직원 이름을 AI에 보내지 않도록 "직원 급여" 하나로 묶음
     const out: Tx[] = expenses
       .filter((e) => e.date)
-      .map((e) => ({ date: e.date!, tx_time: e.tx_time, amount: e.amount, balance_after: e.balance_after, who: (e.counterpart || e.item || '').trim() }))
+      .map((e) => ({
+        date: e.date!,
+        tx_time: e.tx_time,
+        amount: e.amount,
+        balance_after: e.balance_after,
+        who: e.category === 'labor' ? '직원 급여' : (e.counterpart || e.item || '').trim(),
+      }))
     const inc: Tx[] = income.map((i) => ({ date: i.date, tx_time: i.tx_time, amount: i.amount, balance_after: i.balance_after, who: (i.counterpart || i.memo || '').trim() }))
 
     // 현재 잔고 = 가장 최근 거래의 거래후잔액
