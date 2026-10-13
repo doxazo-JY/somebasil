@@ -10,7 +10,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 const CLOCK_ORIGIN = process.env.NEXT_PUBLIC_CLOCK_ORIGIN
 const CLOCK_HOST = CLOCK_ORIGIN ? new URL(CLOCK_ORIGIN).host : null
 
-const ALLOWED = [/^\/clock(\/|$)/, /^\/api\/clock(\/|$)/]
+// /api/cron/* 은 Vercel Cron이 어느 주소로 호출해도 동작하도록 허용 (CRON_SECRET으로 보호됨)
+const ALLOWED = [/^\/clock(\/|$)/, /^\/api\/clock(\/|$)/, /^\/api\/cron\//]
 
 export function proxy(request: NextRequest) {
   if (!CLOCK_HOST || request.headers.get('host') !== CLOCK_HOST) return NextResponse.next()
