@@ -72,8 +72,9 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
   })
 
   // 넓은 화면: 왼쪽 사무실(스크롤해도 고정) + 오른쪽 선택한 AI / 폰: 위아래
+  // 왼쪽 폭 = 60%, 단 그림이 화면 높이를 넘지 않게 (화면 높이 - 여백) × 24/17 이하
   return (
-    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
+    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,min(60%,calc((100vh-14rem)*1.41)))_minmax(0,1fr)] lg:gap-6 lg:items-start">
       <div className="rounded-xl border border-gray-100 overflow-hidden lg:sticky lg:top-6 bg-[#e9e2d0]">
         <OfficeScene agents={sceneAgents} selected={selected} onSelect={setSelected} />
         <p className="px-3 py-1.5 text-[10px] text-gray-400 text-right bg-white/60">

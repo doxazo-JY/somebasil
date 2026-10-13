@@ -12,7 +12,7 @@ export default async function OfficePage() {
   const [{ open, closed }, runs, assistantHistory] = await Promise.all([getInbox(), getRecentRuns(40), getAssistantHistory()])
 
   return (
-    <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full max-w-6xl">
+    <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <PageTabs group="operations" />
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">AI 사무실</h1>
