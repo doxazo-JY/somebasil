@@ -43,11 +43,12 @@ export default function OfficeView({ open, closed, runs, today, configProblem }:
   const [selected, setSelected] = useState(initial.key)
   const agent = OFFICE_AGENTS.find((a) => a.key === selected) ?? OFFICE_AGENTS[0]
 
+  // 넓은 화면: 왼쪽 사무실(스크롤해도 고정) + 오른쪽 선택한 AI의 메시지 / 폰: 위아래
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-6 lg:items-start">
       {/* 사무실 — 고정 팔레트 픽셀 일러스트 */}
       <div
-        className="rounded-xl border border-gray-100 overflow-hidden"
+        className="rounded-xl border border-gray-100 overflow-hidden lg:sticky lg:top-6"
         style={{
           backgroundColor: '#efe8d6',
           backgroundImage:
