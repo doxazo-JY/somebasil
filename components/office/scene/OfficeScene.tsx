@@ -143,7 +143,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
         const im = img(f.src)
         const x = f.col * TILE + Math.round((f.fw * TILE - im.width) / 2)
         const y = (f.row + f.fh) * TILE - im.height + (f.dy ?? 0)
-        return { im, x, y, zY: (f.row + f.fh) * TILE + (f.z ?? 0) * 0.5 - (f.onWall ? 1000 : 0) }
+        return { im, x, y, flip: !!f.flip, zY: (f.row + f.fh) * TILE + (f.z ?? 0) * 0.5 - (f.onWall ? 1000 : 0) }
       })
 
       // ── 상태 → 목표
@@ -240,7 +240,17 @@ export default function OfficeScene({ agents, selected, onSelect }: {
         ctx.drawImage(base, 0, 0)
 
         type Drawable = { zY: number; draw: () => void }
-        const drawables: Drawable[] = furniture.map((f) => ({ zY: f.zY, draw: () => ctx.drawImage(f.im, f.x, f.y) }))
+        const drawables: Drawable[] = furniture.map((f) => ({
+          zY: f.zY,
+          draw: () => {
+            if (!f.flip) return ctx.drawImage(f.im, f.x, f.y)
+            ctx.save()
+            ctx.translate(f.x + f.im.width, f.y)
+            ctx.scale(-1, 1)
+            ctx.drawImage(f.im, 0, 0)
+            ctx.restore()
+          },
+        }))
 
         for (const ch of chars.values()) {
           const sitting = ch.pose === 'sit-type' || ch.pose === 'sit-read'
