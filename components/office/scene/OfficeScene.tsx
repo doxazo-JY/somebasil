@@ -208,10 +208,11 @@ export default function OfficeScene({ agents, selected, onSelect }: {
 
       const ctx = canvas.getContext('2d')!
       let last = performance.now()
+      let drawn = false // 첫 장면은 보이든 말든 바로 그림 (탭이 가려져 있어도)
 
       const frame = (now: number) => {
         if (!alive) return
-        if (!visible || now - last < FRAME_MS) {
+        if (drawn && (!visible || now - last < FRAME_MS)) {
           if (!visible) last = now // 다시 보일 때 그동안 시간만큼 한꺼번에 움직이지 않게
           raf = requestAnimationFrame(frame)
           return
@@ -362,6 +363,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           if (l.el.style.transform !== t) l.el.style.transform = t
         }
 
+        drawn = true
         raf = requestAnimationFrame(frame)
       }
       frame(performance.now()) // 첫 장면은 바로 그림 (탭이 가려져 있어도)

@@ -52,6 +52,7 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
   const isRunning = (key: string) =>
     lastRun(key)?.status === 'running' ||
     runningKey === key ||
+    (runningKey === 'plan' && key === 'business') || // 기획 요청은 경영 AI만 (마케팅 안 이어짐)
     (runningKey === 'business' && key === 'marketing') ||
     (key === 'assistant' && assistantBusy)
 
@@ -89,7 +90,7 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
         open={openOf(agent.key)}
         closed={closed.filter((i) => i.agent === agent.key)}
         configProblem={configProblem}
-        onRunning={(on) => setRunningKey(on ? agent.key : null)}
+        onRunning={(on, what) => setRunningKey(on ? (what === 'plan' ? 'plan' : agent.key) : null)}
         onAssistantBusy={setAssistantBusy}
       />
     </div>
@@ -98,7 +99,7 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
 
 function AgentDetail({ agent, assistantHistory, last, runs, open, closed, configProblem, onRunning, onAssistantBusy }: {
   agent: OfficeAgent
-  onRunning: (on: boolean) => void
+  onRunning: (on: boolean, what?: 'default' | 'plan') => void
   onAssistantBusy: (busy: boolean) => void
   assistantHistory: { q: string; a: string }[]
   last: AiRun | undefined
@@ -113,15 +114,16 @@ function AgentDetail({ agent, assistantHistory, last, runs, open, closed, config
   const [showRuns, setShowRuns] = useState(false)
   const blocked = agent.usesAi && !!configProblem
 
-  async function run() {
+  // what: 기본 = 이 AI의 점검, 'plan' = 경영 AI 기획 (topic 비우면 이번 주 추천)
+  async function run(what: 'default' | 'plan' = 'default', topic = '') {
     if (!agent.run) return
     setRunning(true)
-    onRunning(true)
+    onRunning(true, what)
     setError(null)
     const res = await fetch('/api/ai/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent: agent.run }),
+      body: JSON.stringify(what === 'plan' ? { agent: 'plan', topic } : { agent: agent.run }),
     })
     const data = await res.json().catch(() => ({}))
     setRunning(false)
@@ -170,11 +172,11 @@ function AgentDetail({ agent, assistantHistory, last, runs, open, closed, config
             )}
             {agent.run && (
               <button
-                onClick={run}
+                onClick={() => run()}
                 disabled={running || blocked}
                 className="text-xs px-3 py-1.5 rounded-lg border border-[#1a5c3a] text-[#1a5c3a] hover:bg-[#e6f0ea] disabled:opacity-40 whitespace-nowrap"
               >
-                {running ? (agent.usesAi ? '점검하는 중… (1분 정도)' : '점검하는 중…') : '지금 점검'}
+                {running ? (agent.usesAi ? '일하는 중… (1분 정도)' : '점검하는 중…') : agent.plan ? '지난주 다시 분석' : '지금 점검'}
               </button>
             )}
           </div>
@@ -211,7 +213,39 @@ function AgentDetail({ agent, assistantHistory, last, runs, open, closed, config
         )}
       </div>
 
+      {agent.plan && <PlanRequest running={running} disabled={blocked} onRun={(topic) => run('plan', topic)} />}
+
       <InboxList open={open} closed={closed} hideAgent emptyText={`${agent.name}가 올린 챙길 일이 없어요`} />
     </div>
+  )
+}
+
+// 경영 AI 기획 요청 — 주제를 적으면 기획안, 비우면 이번 주 추천
+function PlanRequest({ running, disabled, onRun }: { running: boolean; disabled: boolean; onRun: (topic: string) => void }) {
+  const [topic, setTopic] = useState('')
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        onRun(topic.trim())
+      }}
+      className="bg-white rounded-xl border border-gray-100 px-5 py-4 space-y-2"
+    >
+      <p className="text-sm font-semibold text-gray-900">기획 요청</p>
+      <p className="text-xs text-gray-500 [word-break:keep-all]">주제를 적으면 우리 카페 데이터와 계절·기념일을 같이 보고 기획안을 써요. 비워 두면 이번 주 추천을 받아요.</p>
+      <div className="flex gap-2">
+        <input
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          maxLength={300}
+          placeholder="예: 12월 크리스마스 시즌 메뉴 / 평일 오후 3~5시 손님 늘리기"
+          disabled={disabled}
+          className="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]"
+        />
+        <button type="submit" disabled={running || disabled} className="text-xs px-4 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-40 whitespace-nowrap">
+          {running ? '쓰는 중…' : topic.trim() ? '기획 요청' : '이번 주 추천'}
+        </button>
+      </div>
+    </form>
   )
 }

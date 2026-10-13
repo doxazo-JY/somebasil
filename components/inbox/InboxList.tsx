@@ -50,12 +50,13 @@ export default function InboxList({ open, closed, hideAgent = false, emptyText =
             <div className="flex items-center gap-2 text-[11px]">
               {!hideAgent && <span className="px-2 py-0.5 rounded-full bg-[#e6f0ea] text-[#1a5c3a] font-semibold">{AGENT_LABEL[item.agent] ?? item.agent}</span>}
               {(item.meta as { type?: string } | null)?.type === 'tip' && <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 font-semibold">이번 주 추천</span>}
+              {(item.meta as { type?: string } | null)?.type === 'plan' && <span className="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 font-semibold">기획안 · {(item.meta as { topic?: string }).topic}</span>}
               {item.severity === 'warn' && <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">확인 필요</span>}
               <span className="text-gray-400">{fmtDate(item.created_at)}</span>
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-semibold text-gray-900 [word-break:keep-all]">{item.title}</h3>
-              <p className="text-sm text-gray-600 leading-relaxed [word-break:keep-all]">{item.body}</p>
+              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line [word-break:keep-all]">{item.body}</p>
             </div>
             {item.evidence && item.evidence.length > 0 && (
               <dl className="flex flex-wrap gap-2">
@@ -71,7 +72,7 @@ export default function InboxList({ open, closed, hideAgent = false, emptyText =
             {item.action && item.kind !== 'question' && (
               <div className="rounded-lg border border-[#1a5c3a]/20 bg-[#f4f9f6] px-3 py-2">
                 <p className="text-[11px] font-semibold text-[#1a5c3a]">할 일</p>
-                <p className="text-sm text-gray-800 [word-break:keep-all]">{item.action}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-line [word-break:keep-all]">{item.action}</p>
               </div>
             )}
             <div className="flex justify-end gap-2">
