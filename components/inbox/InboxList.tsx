@@ -11,8 +11,13 @@ function fmtDate(iso: string) {
   return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short' }).format(new Date(iso))
 }
 
-// 업무함 항목 목록 — 처리 전 / 처리한 항목
-export default function InboxList({ open, closed }: { open: InboxItem[]; closed: InboxItem[] }) {
+// 업무함 항목 목록 — 처리 전 / 처리한 항목 (사무실에서 AI별로 걸러서 사용)
+export default function InboxList({ open, closed, hideAgent = false, emptyText = '챙길 일이 없어요' }: {
+  open: InboxItem[]
+  closed: InboxItem[]
+  hideAgent?: boolean
+  emptyText?: string
+}) {
   const router = useRouter()
   const [showClosed, setShowClosed] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
@@ -31,9 +36,9 @@ export default function InboxList({ open, closed }: { open: InboxItem[]; closed:
   return (
     <div className="space-y-3">
       {open.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-200 px-6 py-12 text-center">
-          <p className="text-sm font-semibold text-gray-700">챙길 일이 없어요</p>
-          <p className="text-xs text-gray-400 mt-1 [word-break:keep-all]">AI 업무팀이 매일 아침 점검해서 챙길 일이 있을 때만 여기에 올려요</p>
+        <div className="bg-white rounded-xl border border-dashed border-gray-200 px-6 py-10 text-center">
+          <p className="text-sm font-semibold text-gray-700">{emptyText}</p>
+          <p className="text-xs text-gray-400 mt-1 [word-break:keep-all]">점검해서 챙길 일이 있을 때만 올라와요</p>
         </div>
       ) : (
         open.map((item) => (
@@ -42,7 +47,7 @@ export default function InboxList({ open, closed }: { open: InboxItem[]; closed:
             className={`bg-white rounded-xl border px-5 py-4 space-y-3 ${item.severity === 'warn' ? 'border-amber-200' : 'border-gray-100'}`}
           >
             <div className="flex items-center gap-2 text-[11px]">
-              <span className="px-2 py-0.5 rounded-full bg-[#e6f0ea] text-[#1a5c3a] font-semibold">{AGENT_LABEL[item.agent] ?? item.agent}</span>
+              {!hideAgent && <span className="px-2 py-0.5 rounded-full bg-[#e6f0ea] text-[#1a5c3a] font-semibold">{AGENT_LABEL[item.agent] ?? item.agent}</span>}
               {item.severity === 'warn' && <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">확인 필요</span>}
               <span className="text-gray-400">{fmtDate(item.created_at)}</span>
             </div>
