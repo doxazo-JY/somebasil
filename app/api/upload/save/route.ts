@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { recalcMonthlySummary } from '@/lib/supabase/recalc'
 import type { DailySalesRow } from '../daily-sales/route'
@@ -6,6 +6,10 @@ import type { BankRow } from '../bank/route'
 import type { MenuRow } from '../menu/route'
 import type { WorkShift, WorklogStaff, WorklogPayrollItem } from '@/lib/worklog-parser'
 import { saveWorklog } from '@/lib/supabase/worklog-save'
+import { pickAgentsAfterUpload, runJobs } from '@/lib/ai/agents/after-upload'
+
+// 매출·통장 저장 뒤 AI 점검을 응답 후에 이어서 돌리므로 넉넉히 (경영 → 마케팅 1~2분)
+export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
   const { type, rows, filename, worklog } = await req.json() as {
@@ -152,5 +156,15 @@ export async function POST(req: NextRequest) {
     status: 'success',
   })
 
-  return NextResponse.json({ ok: true })
+  // 매출·통장이 들어왔으면 그 데이터로 AI 점검 (응답은 바로 보내고 뒤에서 실행)
+  let aiStarted: string[] = []
+  if (type === 'daily_sales' || type === 'bank_transaction') {
+    const jobs = await pickAgentsAfterUpload(type).catch(() => [])
+    if (jobs.length > 0) {
+      after(() => runJobs(jobs))
+      aiStarted = jobs.map((j) => j.label)
+    }
+  }
+
+  return NextResponse.json({ ok: true, aiStarted })
 }

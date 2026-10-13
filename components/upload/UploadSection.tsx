@@ -170,6 +170,12 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
     }
   }
 
+  // 매출·통장 저장 후 AI 점검이 시작됐으면 함께 안내
+  function savedText(aiStarted: string[] | undefined) {
+    if (!aiStarted?.length) return '저장 완료!'
+    return `저장 완료! 올린 데이터로 ${aiStarted.join('·')}가 점검을 시작했어요. 1~2분 뒤 사무실에서 확인하세요.`
+  }
+
   async function handleSaveMenu(rows: MenuRow[]) {
     setSaving(true)
     setMessage(null)
@@ -232,7 +238,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
     if (!res.ok) {
       setMessage({ text: json.error ?? '저장 실패', ok: false })
     } else {
-      setMessage({ text: '저장 완료!', ok: true })
+      setMessage({ text: savedText(json.aiStarted), ok: true })
       setPreview(null)
       router.refresh()
     }
@@ -267,7 +273,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
     if (!res.ok) {
       setMessage({ text: json.error ?? '저장 실패', ok: false })
     } else {
-      setMessage({ text: '저장 완료!', ok: true })
+      setMessage({ text: savedText(json.aiStarted), ok: true })
       setPreview(null)
       router.refresh()
     }

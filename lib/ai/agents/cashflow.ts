@@ -4,7 +4,7 @@ import { fetchAllRows } from '@/lib/supabase/fetchAll'
 import { kstDate } from '@/lib/attendance/tokens'
 import { generateStructured, recordRun, type RunTrigger } from '../client'
 
-// 자금 관리 AI (내부 키 cashflow) — 매주 월요일 아침. 통장 거래(입금·출금)로 앞으로 30일 동안 잔고가 부족해질 위험을 미리 알림
+// 자금 관리 AI (내부 키 cashflow) — 통장 업로드 직후(주 1번, after-upload.ts) 또는 [지금 점검]. 통장 거래(입금·출금)로 앞으로 30일 동안 잔고가 부족해질 위험을 미리 알림
 // AI에 원본 거래를 다 보내지 않고 요약해서 보냄: 현재 잔고 · 최근 90일 일별 입출금 · 반복 지출(매달 나가는 돈) · 큰 지출
 // 위험이 없으면 업무함에 아무것도 올리지 않음
 

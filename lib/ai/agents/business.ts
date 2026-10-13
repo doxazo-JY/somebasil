@@ -4,7 +4,7 @@ import { getRecentWeekOptions, getWeekDetail, getWeeklySummary, type WeekDetail 
 import { getDiagnosisMonths } from '@/lib/supabase/queries/diagnosis'
 import { generateStructured, recordRun, type RunTrigger } from '../client'
 
-// 경영 AI — 매주 수요일 아침, 지난주(월~일)를 분석해 "이번 주 꼭 볼 것 3가지"를 업무함에 올림
+// 경영 AI — 매출·통장 업로드 직후(after-upload.ts) 또는 [지금 점검], 지난주(월~일)를 분석해 "이번 주 꼭 볼 것 3가지"를 업무함에 올림
 // 읽는 데이터: 지난주 상세 · 그 전주 상세 · 최근 8주 추이 · 최근 3개월 비용 구조
 // 결과의 marketing_topic은 마케팅 AI가 이어받을 주제 (ai_runs.output에 보관)
 

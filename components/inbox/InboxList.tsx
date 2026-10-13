@@ -49,6 +49,7 @@ export default function InboxList({ open, closed, hideAgent = false, emptyText =
           >
             <div className="flex items-center gap-2 text-[11px]">
               {!hideAgent && <span className="px-2 py-0.5 rounded-full bg-[#e6f0ea] text-[#1a5c3a] font-semibold">{AGENT_LABEL[item.agent] ?? item.agent}</span>}
+              {(item.meta as { type?: string } | null)?.type === 'tip' && <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 font-semibold">이번 주 추천</span>}
               {item.severity === 'warn' && <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">확인 필요</span>}
               <span className="text-gray-400">{fmtDate(item.created_at)}</span>
             </div>
