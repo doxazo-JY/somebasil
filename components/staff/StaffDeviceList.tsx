@@ -16,6 +16,7 @@ function fmtDay(iso: string | null) {
 export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
   const router = useRouter()
   const [linkFor, setLinkFor] = useState<StaffRow | null>(null)
+  const [deleteFor, setDeleteFor] = useState<StaffRow | null>(null)
 
   async function patchStaff(id: number, updates: object) {
     await fetch('/api/staff', {
@@ -90,12 +91,117 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
                 >
                   {s.is_active ? '퇴사 처리' : '복직'}
                 </button>
+                <button
+                  onClick={() => setDeleteFor(s)}
+                  className="text-xs px-3 py-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50"
+                >
+                  삭제
+                </button>
               </div>
             </li>
           ))}
         </ul>
       )}
       {linkFor && <LinkQrModal staff={linkFor} onClose={() => { setLinkFor(null); router.refresh() }} />}
+      {deleteFor && (
+        <DeleteStaffModal
+          staff={deleteFor}
+          onClose={() => setDeleteFor(null)}
+          onDeleted={() => { setDeleteFor(null); router.refresh() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// 직원 삭제 — 이름을 다시 입력해야 삭제. 같이 지워지는 기록 건수를 먼저 보여 줌
+const RELATED_LABEL: Record<string, string> = {
+  attendance_logs: 'QR 출퇴근 기록',
+  work_logs: '근무일지(업로드) 기록',
+  staff_salary: '월별 지급액',
+  staff_devices: '등록된 폰',
+  payroll_items: '인건비 수기 항목',
+}
+
+function DeleteStaffModal({ staff, onClose, onDeleted }: { staff: StaffRow; onClose: () => void; onDeleted: () => void }) {
+  const [counts, setCounts] = useState<Record<string, number> | null>(null)
+  const [typed, setTyped] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/attendance/staff?staff_id=${staff.id}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then(setCounts)
+      .catch(() => setError('기록 건수를 불러오지 못했어요'))
+  }, [staff.id])
+
+  const related = counts ? Object.entries(counts).filter(([, n]) => n > 0) : []
+  const matches = typed.trim() === staff.name.trim()
+
+  async function handleDelete() {
+    setDeleting(true)
+    setError(null)
+    const res = await fetch('/api/attendance/staff', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staff_id: staff.id, confirm_name: typed }),
+    })
+    if (res.ok) return onDeleted()
+    setDeleting(false)
+    setError('삭제하지 못했어요. 다시 시도해 주세요.')
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 grid place-items-center px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-gray-900">{staff.name}님을 삭제할까요?</p>
+          <p className="text-xs text-gray-500 [word-break:keep-all]">
+            되돌릴 수 없어요. 테스트로 만든 직원이 아니라면 [퇴사 처리]를 써 주세요.
+          </p>
+        </div>
+
+        <div className="text-xs rounded-lg bg-gray-50 px-3 py-2.5 space-y-1">
+          {!counts && !error && <p className="text-gray-400">같이 지워지는 기록 확인 중…</p>}
+          {counts && related.length === 0 && <p className="text-gray-500">같이 지워지는 기록이 없어요</p>}
+          {related.length > 0 && (
+            <>
+              <p className="text-red-600 font-medium">같이 지워지는 기록</p>
+              {related.map(([table, n]) => (
+                <p key={table} className="text-gray-700 flex justify-between">
+                  <span>{RELATED_LABEL[table] ?? table}</span>
+                  <span className="tabular-nums">{n}건</span>
+                </p>
+              ))}
+            </>
+          )}
+        </div>
+
+        <label className="block space-y-1.5">
+          <span className="text-xs text-gray-500">확인을 위해 이름 <b className="text-gray-900">{staff.name}</b>을(를) 입력해 주세요</span>
+          <input
+            id={`delete-confirm-${staff.id}`}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-1 focus:ring-red-400"
+          />
+        </label>
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="text-xs px-3 py-2 rounded-lg text-gray-500 hover:bg-gray-100">취소</button>
+          <button
+            onClick={handleDelete}
+            disabled={!matches || !counts || deleting}
+            className="text-xs px-3 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-40"
+          >
+            {deleting ? '삭제하는 중…' : '삭제'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
