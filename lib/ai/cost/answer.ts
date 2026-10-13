@@ -8,7 +8,7 @@ import type { CostQuestionMeta } from '../agents/cost'
 
 // 원가 AI 질문에 점장이 적은 답 → 저장안(미리보기) → 점장 확인 후 저장
 //   AI는 답을 정리만 함. DB 저장은 applyProposal()에서 점장이 [이대로 저장]을 눌렀을 때만
-//   저장 방식은 레시피 엑셀 업로드(app/api/upload/recipe)와 같음
+//   저장 방식은 레시피 엑셀 업로드(lib/upload/recipe.ts)와 같음
 
 type Item = { ingredient: string; quantity: number; is_new: boolean; unit: string }
 

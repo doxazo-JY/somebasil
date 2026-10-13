@@ -3,508 +3,189 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import FileDropZone from './FileDropZone'
-import PreviewTable, { type PreviewRow } from './PreviewTable'
-import MenuPreviewTable from './MenuPreviewTable'
-import WorklogPreview from './WorklogPreview'
-import type { BankRow } from '@/app/api/upload/bank/route'
-import type { DailySalesRow } from '@/app/api/upload/daily-sales/route'
-import type { MenuRow } from '@/app/api/upload/menu/route'
-import type { WorklogParseResult } from '@/lib/worklog-parser'
+import type { UploadResult } from '@/app/api/upload/route'
+import type { WeekCoverage } from '@/lib/upload/coverage'
+import type { UncertainTx } from '@/lib/upload/save'
 
-type Tab = 'daily' | 'bank' | 'menu' | 'recipe' | 'worklog'
+// 데이터 넣기 — 파일을 끌어다 놓으면 종류를 알아보고 바로 저장 (저장 버튼 없음)
+//   맨 위 체크리스트: 지난주 매출·통장이 어디까지 들어왔나 (다 들어오면 AI 분석 시작)
+//   아래: 파일별 결과 + 확인할 것(분류가 애매한 통장 출금 · 근무일지 경고)만
 
-type DailyPreview = { type: 'daily'; rows: DailySalesRow[] }
-type BankPreview = { type: 'bank'; rows: PreviewRow[]; originals: BankRow[] }
-type MenuPreview = { type: 'menu'; rows: MenuRow[] }
-type WorklogPreviewState = { type: 'worklog' } & WorklogParseResult
-type PreviewState = DailyPreview | BankPreview | MenuPreview | WorklogPreviewState
+type Item = { name: string; status: 'reading' | 'done' | 'error'; result?: UploadResult; error?: string }
 
-interface RecipeUploadStats {
-  ingredientCount: number
-  pricedCount: number
-  subRecipeCount: number
-  subRecipeItemCount: number
-  recipeMenuCount: number
-  recipeItemCount: number
-  packagingSetCount: number
-}
+const CATEGORY_OPTIONS = [
+  { value: 'ingredients_cash', label: '재료비(현금)' },
+  { value: 'ingredients_card', label: '재료비(카드)' },
+  { value: 'labor', label: '인건비' },
+  { value: 'fixed', label: '고정비' },
+  { value: 'equipment', label: '설비투자' },
+  { value: 'excluded', label: '제외' },
+]
 
-// fetch 응답이 JSON이 아닐 때(서버 502/504 HTML 페이지 등) 안전하게 파싱
-async function safeJson(res: Response): Promise<any> {
-  try {
-    return await res.json()
-  } catch {
-    return null
-  }
-}
+const md = (d: string | null) => (d ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : '')
 
-function bankRowToPreview(row: BankRow): PreviewRow {
-  return {
-    date: row.date,
-    memo: row.memo,
-    amount: row.type === 'income' ? (row.income ?? 0) : (row.expense ?? 0),
-    category: row.category,
-    type: row.type,
-  }
-}
-
-interface UploadSectionProps {
-  /** 통장 탭에서만 노출할 추가 컨텐츠 (재분류 테이블 등) */
-  bankExtras?: React.ReactNode
-  /** 메뉴 마스터 탭에서만 노출할 추가 컨텐츠 (마스터 관리 등) */
-  menuExtras?: React.ReactNode
-}
-
-export default function UploadSection({ bankExtras, menuExtras }: UploadSectionProps = {}) {
+export default function UploadSection({ coverage: initialCoverage, weeklyDone: initialDone }: { coverage: WeekCoverage; weeklyDone: boolean }) {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('daily')
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [preview, setPreview] = useState<PreviewState | null>(null)
-  const [recipeStats, setRecipeStats] = useState<RecipeUploadStats | null>(null)
-  const [filename, setFilename] = useState('')
-  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  const [items, setItems] = useState<Item[]>([])
+  const [busy, setBusy] = useState(false)
+  const [coverage, setCoverage] = useState(initialCoverage)
+  const [weeklyDone, setWeeklyDone] = useState(initialDone)
+  const [aiStarted, setAiStarted] = useState<string[]>([])
 
-  // 일별 매출 탭: 여러 파일을 순차 파싱해서 하나의 미리보기로 합침
   async function handleFiles(files: File[]) {
-    setLoading(true)
-    setPreview(null)
-    setRecipeStats(null)
-    setMessage(null)
+    if (busy || files.length === 0) return
+    setBusy(true)
+    setAiStarted([])
+    const start = items.length
+    setItems((prev) => [...prev, ...files.map((f) => ({ name: f.name, status: 'reading' as const }))])
 
-    const mergedRows: DailySalesRow[] = []
-    const errors: string[] = []
-
-    for (const file of files) {
-      const formData = new FormData()
-      formData.append('file', file)
-      try {
-        const res = await fetch('/api/upload/daily-sales', { method: 'POST', body: formData })
-        const json = await safeJson(res)
-        if (!res.ok) {
-          errors.push(`${file.name}: ${json?.error ?? `파싱 실패 (${res.status})`}`)
-          continue
-        }
-        mergedRows.push(...(json.rows as DailySalesRow[]))
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '알 수 없는 오류'
-        errors.push(`${file.name}: ${msg}`)
-      }
+    // 하나씩 순서대로 (같은 달 재계산이 겹치지 않게)
+    let bank = false
+    for (let i = 0; i < files.length; i++) {
+      const form = new FormData()
+      form.append('file', files[i])
+      const res = await fetch('/api/upload', { method: 'POST', body: form }).catch(() => null)
+      const data = res ? await res.json().catch(() => null) : null
+      const next: Item = res?.ok && data ? { name: files[i].name, status: 'done', result: data } : { name: files[i].name, status: 'error', error: data?.error ?? '올리지 못했어요. 다시 넣어 주세요.' }
+      if (next.result?.kind === 'bank_transaction') bank = true
+      setItems((prev) => prev.map((it, idx) => (idx === start + i ? next : it)))
     }
 
-    setLoading(false)
-    setFilename(files.length === 1 ? files[0].name : `${files.length}개 파일`)
-
-    if (mergedRows.length > 0) {
-      setPreview({ type: 'daily', rows: mergedRows })
-    }
-    if (errors.length > 0) {
-      setMessage({ text: `일부 파일 처리 실패:\n${errors.join('\n')}`, ok: false })
-    } else {
-      setMessage({ text: `${files.length}개 파일 파싱 완료`, ok: true })
-    }
-  }
-
-  async function handleFile(file: File) {
-    setLoading(true)
-    setPreview(null)
-    setRecipeStats(null)
-    setMessage(null)
-
-    const formData = new FormData()
-    formData.append('file', file)
-
-    try {
-      // 레시피 탭: 파싱 + 저장이 한 번에 (파일 크고 시트 4개라 미리보기 생략)
-      if (tab === 'recipe') {
-        const res = await fetch('/api/upload/recipe', { method: 'POST', body: formData })
-        const json = await safeJson(res)
-        if (!res.ok) {
-          setMessage({ text: json?.error ?? `업로드 실패 (${res.status})`, ok: false })
-          return
-        }
-        setRecipeStats(json.stats as RecipeUploadStats)
-        setMessage({ text: '저장 완료! 메뉴 원가 페이지에서 확인하세요.', ok: true })
-        router.refresh()
-        return
-      }
-
-      const endpointMap = {
-        daily: '/api/upload/daily-sales',
-        bank: '/api/upload/bank',
-        menu: '/api/upload/menu',
-        worklog: '/api/upload/worklog',
-      } as const
-      const res = await fetch(endpointMap[tab], { method: 'POST', body: formData })
-      const json = await safeJson(res)
-
-      if (!res.ok) {
-        setMessage({ text: json?.error ?? `파싱 실패 (${res.status})`, ok: false })
-        return
-      }
-
-      setFilename(json.filename)
-
-      if (tab === 'daily') {
-        setPreview({ type: 'daily', rows: json.rows as DailySalesRow[] })
-      } else if (tab === 'bank') {
-        const originals = json.rows as BankRow[]
-        setPreview({
-          type: 'bank',
-          rows: originals.map(bankRowToPreview),
-          originals,
-        })
-      } else if (tab === 'menu') {
-        setPreview({ type: 'menu', rows: json.rows as MenuRow[] })
-      } else if (tab === 'worklog') {
-        const r = json as WorklogParseResult
-        setPreview({ type: 'worklog', shifts: r.shifts, staff: r.staff, months: r.months, payrollItems: r.payrollItems ?? [], warnings: r.warnings })
-      }
-    } catch (err) {
-      // 네트워크 끊김 / 타임아웃 / JSON 파싱 실패 — 모바일에서 흔함
-      console.error('[upload]', err)
-      const msg = err instanceof Error ? err.message : '알 수 없는 오류'
-      setMessage({ text: `업로드 실패: ${msg} (네트워크 확인 후 재시도)`, ok: false })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // 매출·통장 저장 후 AI 점검이 시작됐으면 함께 안내
-  function savedText(aiStarted: string[] | undefined) {
-    if (!aiStarted?.length) return '저장 완료!'
-    return `저장 완료! 올린 데이터로 ${aiStarted.join('·')}가 점검을 시작했어요. 1~2분 뒤 사무실에서 확인하세요.`
-  }
-
-  async function handleSaveMenu(rows: MenuRow[]) {
-    setSaving(true)
-    setMessage(null)
-    const res = await fetch('/api/upload/save', {
+    // 다 넣은 뒤 한 번 — 체크리스트 갱신 + AI 분석 판단
+    const fin = await fetch('/api/upload/finish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'menu', rows, filename }),
-    })
-    const json = await res.json()
-    setSaving(false)
-    if (!res.ok) {
-      setMessage({ text: json.error ?? '저장 실패', ok: false })
-    } else {
-      setMessage({ text: `저장 완료! ${rows.length}개 메뉴 반영됨.`, ok: true })
-      setPreview(null)
-      router.refresh()
+      body: JSON.stringify({ bank }),
+    }).catch(() => null)
+    const f = fin ? await fin.json().catch(() => null) : null
+    if (f?.coverage) setCoverage(f.coverage)
+    if (f) {
+      setAiStarted(f.aiStarted ?? [])
+      setWeeklyDone(!!f.weeklyDone || (f.aiStarted ?? []).includes('경영 AI'))
     }
+    setBusy(false)
+    router.refresh()
   }
 
-  async function handleSaveWorklog(p: WorklogPreviewState) {
-    setSaving(true)
-    setMessage(null)
-    const res = await fetch('/api/upload/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'work_logs',
-        filename,
-        worklog: { shifts: p.shifts, staff: p.staff, months: p.months, payrollItems: p.payrollItems },
-      }),
-    })
-    const json = await safeJson(res)
-    setSaving(false)
-    if (!res.ok) {
-      setMessage({ text: json?.error ?? `저장 실패 (${res.status})`, ok: false })
-    } else {
-      const created = (json.createdStaff as string[]) ?? []
-      setMessage({
-        text: `저장 완료! 근무 ${json.savedShifts}건${json.savedPayrollItems ? ` · 인건비 수기 항목 ${json.savedPayrollItems}건` : ''}${created.length > 0 ? ` · 새 직원 ${created.join(', ')}` : ''}`,
-        ok: true,
-      })
-      setPreview(null)
-      router.refresh()
-    }
-  }
-
-  async function handleSaveDaily(rows: DailySalesRow[]) {
-    setSaving(true)
-    setMessage(null)
-
-    const res = await fetch('/api/upload/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'daily_sales', rows, filename }),
-    })
-
-    const json = await res.json()
-    setSaving(false)
-
-    if (!res.ok) {
-      setMessage({ text: json.error ?? '저장 실패', ok: false })
-    } else {
-      setMessage({ text: savedText(json.aiStarted), ok: true })
-      setPreview(null)
-      router.refresh()
-    }
-  }
-
-  async function handleSaveBank(rows: PreviewRow[], originals: BankRow[]) {
-    setSaving(true)
-    setMessage(null)
-
-    // PreviewRow의 수정된 category를 originals에 병합 (tx_time / balance_after 보존)
-    const payload = originals.map((orig, i) => ({
-      date: orig.date,
-      tx_time: orig.tx_time,
-      balance_after: orig.balance_after,
-      memo: orig.memo,
-      counterpart: orig.counterpart, // 거래처별 누적 매칭용
-      income: orig.income,
-      expense: orig.expense,
-      category: rows[i]?.category ?? orig.category,
-      type: orig.type,
-    }))
-
-    const res = await fetch('/api/upload/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'bank_transaction', rows: payload, filename }),
-    })
-
-    const json = await res.json()
-    setSaving(false)
-
-    if (!res.ok) {
-      setMessage({ text: json.error ?? '저장 실패', ok: false })
-    } else {
-      setMessage({ text: savedText(json.aiStarted), ok: true })
-      setPreview(null)
-      router.refresh()
-    }
-  }
+  const uncertain = items.flatMap((it) => it.result?.uncertain ?? [])
+  const warnings = items.flatMap((it) => (it.result?.warnings ?? []).map((w) => `${it.name}: ${w}`))
+  const ready = coverage.salesReady && coverage.bankReady
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* 탭 — 모바일은 짧은 라벨, 데스크탑은 풀 라벨 */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit max-w-full">
-        {(['daily', 'bank', 'menu', 'recipe', 'worklog'] as Tab[]).map((t) => {
-          const short =
-            t === 'daily'
-              ? '일별'
-              : t === 'bank'
-                ? '통장'
-                : t === 'menu'
-                  ? '메뉴'
-                  : t === 'recipe'
-                    ? '레시피'
-                    : '근무'
-          const full =
-            t === 'daily'
-              ? '📋 일별 매출'
-              : t === 'bank'
-                ? '🏦 통장 거래내역'
-                : t === 'menu'
-                  ? '🍽️ 메뉴 마스터'
-                  : t === 'recipe'
-                    ? '🥄 레시피·원가'
-                    : '🕐 근무일지'
-          return (
-            <button
-              key={t}
-              onClick={() => { setTab(t); setPreview(null); setRecipeStats(null); setMessage(null) }}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <span className="sm:hidden">{short}</span>
-              <span className="hidden sm:inline">{full}</span>
-            </button>
-          )
-        })}
+    <div className="space-y-4">
+      {/* 지난주 체크리스트 */}
+      <div className={`rounded-xl border px-5 py-4 ${ready ? 'border-[#1a5c3a]/20 bg-[#f4f9f6]' : 'border-gray-100 bg-white'}`}>
+        <p className="text-xs text-gray-500">
+          지난주 <span className="text-gray-400">({coverage.week.label} · {md(coverage.week.start)}~{md(coverage.week.end)})</span>
+        </p>
+        <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+          <CheckLine label="매출" through={coverage.sales} ok={coverage.salesReady} />
+          <CheckLine label="통장" through={coverage.bank} ok={coverage.bankReady} />
+        </div>
+        <p className="mt-1.5 text-xs text-gray-500 [word-break:keep-all]">
+          {aiStarted.length > 0
+            ? `${aiStarted.join('·')}가 분석을 시작했어요. 1~2분 뒤 사무실에서 확인하세요.`
+            : ready
+              ? weeklyDone
+                ? '이번 주 분석은 했어요. 고친 데이터로 다시 보려면 사무실 경영 AI의 [지난주 다시 분석]을 눌러 주세요.'
+                : '다 들어왔어요.'
+              : `${md(coverage.week.end)}(일)까지 들어오면 경영 AI가 지난주를 분석해요.`}
+        </p>
       </div>
 
-      {/* 파일 업로드 */}
       <FileDropZone
-        accept=".xlsx,.xls"
-        hint={
-          tab === 'daily'
-            ? 'POS 일일매출 엑셀 파일 (여러 개 동시 선택 가능)'
-            : tab === 'bank'
-              ? '하나은행 거래내역 엑셀 파일'
-              : tab === 'menu'
-                ? 'POS 메뉴 마스터 엑셀 (5컬럼: ID·Y/N·명칭·단가)'
-                : tab === 'recipe'
-                  ? '레시피 템플릿 엑셀 v5 (4시트: 재료·서브레시피·레시피·포장세트). 부분 입력 OK'
-                  : '알바 근무일지 엑셀 (월별 시트 "26년 8월" 형식, 평일 + 주일 블록)'
-        }
-        onFile={handleFile}
-        onFiles={tab === 'daily' ? handleFiles : undefined}
-        loading={loading}
+        accept=".xls,.xlsx"
+        hint="POS 매출 · 통장 · 메뉴 · 근무일지 · 레시피 양식 — 여러 개 한꺼번에 넣어도 돼요"
+        onFile={(f) => handleFiles([f])}
+        onFiles={handleFiles}
+        loading={busy}
       />
 
-      {/* 메시지 */}
-      {message && (
-        <p className={`text-sm whitespace-pre-line ${message.ok ? 'text-[#1a5c3a]' : 'text-red-500'}`}>
-          {message.text}
-        </p>
+      {/* 파일별 결과 */}
+      {items.length > 0 && (
+        <ul className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-50">
+          {items.map((it, i) => (
+            <li key={i} className="px-4 py-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
+              <span className={`w-4 shrink-0 ${it.status === 'error' ? 'text-red-500' : it.status === 'done' ? 'text-[#1a5c3a]' : 'text-gray-300'}`}>
+                {it.status === 'error' ? '✕' : it.status === 'done' ? '✓' : '…'}
+              </span>
+              <span className="text-gray-800 min-w-0 truncate max-w-[50%]">{it.name}</span>
+              <span className={`text-xs [word-break:keep-all] ${it.status === 'error' ? 'text-red-500' : 'text-gray-500'}`}>
+                {it.status === 'reading' ? '읽는 중…' : it.status === 'error' ? it.error : `${it.result!.label} · ${it.result!.summary}`}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
 
-      {/* 미리보기 */}
-      {preview?.type === 'daily' && (
-        <DailySalesSummary
-          rows={preview.rows}
-          saving={saving}
-          onSave={() => handleSaveDaily(preview.rows)}
-        />
-      )}
-      {preview?.type === 'bank' && (
-        <PreviewTable
-          rows={preview.rows}
-          onSave={(edited) => handleSaveBank(edited, preview.originals)}
-          saving={saving}
-        />
-      )}
-      {preview?.type === 'menu' && (
-        <MenuPreviewTable
-          rows={preview.rows}
-          saving={saving}
-          onSave={() => handleSaveMenu(preview.rows)}
-        />
-      )}
-
-      {preview?.type === 'worklog' && (
-        <WorklogPreview
-          shifts={preview.shifts}
-          staff={preview.staff}
-          months={preview.months}
-          payrollItems={preview.payrollItems}
-          warnings={preview.warnings}
-          saving={saving}
-          onSave={() => handleSaveWorklog(preview)}
-        />
-      )}
-
-      {recipeStats && <RecipeUploadResult stats={recipeStats} />}
-
-      {/* 통장 탭 전용 추가 컨텐츠 (재분류 테이블 등) */}
-      {tab === 'bank' && bankExtras && <div className="mt-4">{bankExtras}</div>}
-      {/* 메뉴 탭 전용 추가 컨텐츠 (마스터 관리 등) */}
-      {tab === 'menu' && menuExtras && <div className="mt-4">{menuExtras}</div>}
-    </div>
-  )
-}
-
-// 레시피 업로드 결과 — 시트별 카운트
-function RecipeUploadResult({ stats }: { stats: RecipeUploadStats }) {
-  const items = [
-    { label: '재료', value: `${stats.ingredientCount}개 (단가 ${stats.pricedCount})` },
-    { label: '서브레시피', value: `${stats.subRecipeCount}종 / 구성 ${stats.subRecipeItemCount}` },
-    { label: '메뉴 레시피', value: `${stats.recipeMenuCount}메뉴 / 라인 ${stats.recipeItemCount}` },
-    { label: '포장세트', value: `${stats.packagingSetCount}세트` },
-  ]
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5">
-      <p className="text-sm font-semibold text-gray-700 mb-3">반영 결과</p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {items.map((it) => (
-          <div key={it.label} className="bg-gray-50 rounded-lg px-3 py-2">
-            <p className="text-[10px] text-gray-400 mb-0.5">{it.label}</p>
-            <p className="text-sm text-gray-800 font-semibold">{it.value}</p>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-gray-400 mt-4 [word-break:keep-all]">
-        부분 입력 시 단가/레시피 누락은 ‘원가 미등록’ 으로 표시됩니다. 추후 같은 양식 재업로드로 갱신 가능.
-      </p>
-    </div>
-  )
-}
-
-// POS 업로드 요약 카드 (라인별 편집은 비효율)
-function DailySalesSummary({
-  rows,
-  saving,
-  onSave,
-}: {
-  rows: DailySalesRow[]
-  saving: boolean
-  onSave: () => void
-}) {
-  const totalAmount = rows.reduce((s, r) => s + r.amount, 0)
-  const orderIds = new Set(rows.map((r) => `${r.date}|${r.order_id}`))
-  const dates = new Set(rows.map((r) => r.date))
-  const categoryTotals: Record<string, number> = {}
-  for (const r of rows) {
-    categoryTotals[r.category] = (categoryTotals[r.category] ?? 0) + r.amount
-  }
-  const dateList = [...dates].sort()
-  const dateRange = dateList.length > 0 ? `${dateList[0]} ~ ${dateList[dateList.length - 1]}` : '-'
-
-  const CATEGORY_LABEL: Record<string, string> = {
-    coffee: '커피&슈페너',
-    drip_coffee: '드립커피',
-    dutch_coffee: '더치커피',
-    matcha: '말차',
-    ade: '에이드',
-    tea: '티',
-    beverage: '음료',
-    dessert: '디저트',
-    season: '시즌',
-    etc: '기타',
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-semibold text-gray-700">파싱 결과</p>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="text-xs px-4 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-50 transition-colors"
-        >
-          {saving ? '저장 중...' : '저장'}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <SummaryCard label="기간" value={dateRange} small />
-        <SummaryCard label="영업일수" value={`${dates.size}일`} />
-        <SummaryCard label="주문 건수" value={`${orderIds.size.toLocaleString()}건`} />
-        <SummaryCard label="총 매출" value={`${totalAmount.toLocaleString()}원`} />
-      </div>
-
-      <div>
-        <p className="text-xs text-gray-400 mb-2">카테고리별 합계</p>
-        <div className="flex flex-col gap-1.5">
-          {Object.entries(categoryTotals)
-            .sort(([, a], [, b]) => b - a)
-            .map(([cat, amount]) => (
-              <div key={cat} className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">{CATEGORY_LABEL[cat] ?? cat}</span>
-                <span className="text-gray-700 font-medium tabular-nums">
-                  {amount.toLocaleString()}원
-                </span>
-              </div>
-            ))}
+      {/* 확인할 것 */}
+      {uncertain.length > 0 && <UncertainList rows={uncertain} />}
+      {warnings.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-amber-800">근무일지에서 확인할 것</p>
+          {warnings.map((w, i) => (
+            <p key={i} className="text-xs text-amber-900 [word-break:keep-all]">{w}</p>
+          ))}
         </div>
-      </div>
-
-      <p className="text-xs text-gray-400 mt-5">
-        총 {rows.length.toLocaleString()}개의 상품 라인이 저장됩니다.
-      </p>
+      )}
     </div>
   )
 }
 
-function SummaryCard({
-  label,
-  value,
-  small,
-}: {
-  label: string
-  value: string
-  small?: boolean
-}) {
+function CheckLine({ label, through, ok }: { label: string; through: string | null; ok: boolean }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2">
-      <p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
-      <p className={`text-gray-800 font-semibold ${small ? 'text-xs' : 'text-sm'}`}>{value}</p>
+    <span className={ok ? 'text-[#1a5c3a]' : 'text-gray-500'}>
+      {ok ? '✓' : '○'} {label} <span className="tabular-nums">{through ? `${md(through)}까지` : '없음'}</span>
+    </span>
+  )
+}
+
+// 자동 분류가 기본값(재료비-카드)으로 떨어진 새 출금 — 맞으면 그대로 두고, 아니면 바꾸기
+function UncertainList({ rows }: { rows: UncertainTx[] }) {
+  const router = useRouter()
+  const [cats, setCats] = useState<Record<number, string>>(() => Object.fromEntries(rows.map((r) => [r.id, r.category])))
+  const [saving, setSaving] = useState<number | null>(null)
+
+  async function change(r: UncertainTx, category: string) {
+    setSaving(r.id)
+    const res = await fetch('/api/upload/edit', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: r.id, item: r.memo, category, amount: r.amount }),
+    }).catch(() => null)
+    setSaving(null)
+    if (res?.ok) {
+      setCats((prev) => ({ ...prev, [r.id]: category }))
+      router.refresh()
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100">
+      <div className="px-4 py-3 border-b border-gray-50">
+        <p className="text-sm font-semibold text-gray-800">분류가 애매한 통장 출금 {rows.length}건</p>
+        <p className="text-xs text-gray-400 [word-break:keep-all]">규칙에 안 걸려서 재료비(카드)로 넣었어요. 맞으면 그대로 두고, 아니면 바꿔 주세요.</p>
+      </div>
+      <ul className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+        {rows.map((r) => (
+          <li key={r.id} className="px-4 py-2 flex items-center gap-3 text-sm">
+            <span className="text-xs text-gray-400 tabular-nums w-10 shrink-0">{md(r.date)}</span>
+            <span className="flex-1 min-w-0 truncate text-gray-800">{r.counterpart || r.memo}</span>
+            <span className="tabular-nums text-gray-700 shrink-0">{r.amount.toLocaleString()}원</span>
+            <select
+              value={cats[r.id]}
+              disabled={saving === r.id}
+              onChange={(e) => change(r, e.target.value)}
+              aria-label="분류"
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-700 shrink-0"
+            >
+              {CATEGORY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -1,6 +1,9 @@
 const FILE_TYPE_LABEL: Record<string, string> = {
-  daily_sales: '일별 매출',
-  bank_transaction: '통장 거래내역',
+  daily_sales: 'POS 매출',
+  bank_transaction: '통장',
+  menu: 'POS 메뉴',
+  work_logs: '근무일지',
+  recipe: '레시피 양식',
 }
 
 interface HistoryItem {

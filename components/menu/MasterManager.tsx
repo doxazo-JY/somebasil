@@ -1,6 +1,6 @@
 'use client'
 
-// 메뉴 마스터 관리 — /upload 메뉴 마스터 탭에서 노출
+// 메뉴 마스터 관리 — /upload 데이터 고치기 > 메뉴 목록
 // 표 형태: 1열 마스터명 (정렬), 2열 매칭 POS 이름 chips + ✏️, 3열 활성 토글
 
 import { useState, useMemo } from 'react'

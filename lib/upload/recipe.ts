@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { createServerClient } from '@/lib/supabase/server'
+import { UploadError } from './read'
 import { stripVariantSuffix } from '@/lib/menu-utils'
 
-// 레시피 템플릿 v5 파서 + 저장 일체형
+// 레시피 템플릿(v5~) 파서 + 저장 일체형 — 통합 업로드(app/api/upload)에서 호출
 // - 4시트(재료/서브레시피/레시피/포장세트) 파싱
 // - ❓ / 빈 값 / 샘플(📌) 행 스킵
 // - 단가는 (1세트용량 × 세트수)에서 직접 재계산 (엑셀 수식 캐시 무시)
@@ -167,12 +167,21 @@ function parsePackagingSets(rows: unknown[][]): PackagingParsed[] {
   return result
 }
 
-export async function POST(req: NextRequest) {
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  if (!file) return NextResponse.json({ error: '파일이 없습니다.' }, { status: 400 })
+export function isRecipeWorkbook(wb: XLSX.WorkBook): boolean {
+  return [SHEETS.ingredients, SHEETS.subRecipes, SHEETS.recipes].every((n) => wb.SheetNames.includes(n))
+}
 
-  const buffer = await file.arrayBuffer()
+export interface RecipeUploadStats {
+  ingredientCount: number
+  pricedCount: number
+  subRecipeCount: number
+  subRecipeItemCount: number
+  recipeMenuCount: number
+  recipeItemCount: number
+  packagingSetCount: number
+}
+
+export async function saveRecipeWorkbook(buffer: ArrayBuffer): Promise<RecipeUploadStats> {
   const workbook = XLSX.read(buffer, { type: 'array' })
 
   const ingredients = parseIngredients(getRows(workbook, SHEETS.ingredients))
@@ -181,7 +190,7 @@ export async function POST(req: NextRequest) {
   const packaging = parsePackagingSets(getRows(workbook, SHEETS.packaging))
 
   if (ingredients.length === 0) {
-    return NextResponse.json({ error: '재료 시트가 비어있거나 파싱 실패' }, { status: 400 })
+    throw new UploadError()
   }
 
   const supabase = createServerClient()
@@ -197,13 +206,13 @@ export async function POST(req: NextRequest) {
   const { error: ingErr } = await supabase
     .from('ingredients')
     .upsert(ingPayload, { onConflict: 'name' })
-  if (ingErr) return NextResponse.json({ error: `재료 저장 실패: ${ingErr.message}` }, { status: 500 })
+  if (ingErr) throw new UploadError()
 
   // 이름 → id 맵
   const { data: ingRows, error: ingFetchErr } = await supabase
     .from('ingredients')
     .select('id, name')
-  if (ingFetchErr) return NextResponse.json({ error: ingFetchErr.message }, { status: 500 })
+  if (ingFetchErr) throw new UploadError()
   const ingByName = new Map<string, number>(ingRows!.map((r) => [r.name, r.id]))
 
   // ─── 2. ingredient_prices (단가 있는 매입재료만) ───
@@ -219,7 +228,7 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase
       .from('ingredient_prices')
       .upsert(priceRows, { onConflict: 'ingredient_id,effective_date' })
-    if (error) return NextResponse.json({ error: `단가 저장 실패: ${error.message}` }, { status: 500 })
+    if (error) throw new UploadError()
   }
 
   // ─── 3. sub_recipes + items ───
@@ -242,7 +251,7 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase
       .from('sub_recipes')
       .upsert(subRecipePayload, { onConflict: 'output_ingredient_id' })
-    if (error) return NextResponse.json({ error: `서브레시피 저장 실패: ${error.message}` }, { status: 500 })
+    if (error) throw new UploadError()
   }
   // sub_recipe_items: 기존 items 삭제 후 재삽입 (구성 변경 반영)
   const { data: subRecipeRows } = await supabase
@@ -270,7 +279,7 @@ export async function POST(req: NextRequest) {
   }
   if (subItemRows.length > 0) {
     const { error } = await supabase.from('sub_recipe_items').insert(subItemRows)
-    if (error) return NextResponse.json({ error: `서브레시피 구성 저장 실패: ${error.message}` }, { status: 500 })
+    if (error) throw new UploadError()
   }
 
   // ─── 4. recipes (메뉴별) ───
@@ -300,7 +309,7 @@ export async function POST(req: NextRequest) {
   })
   if (dedupedRecipeRows.length > 0) {
     const { error } = await supabase.from('recipes').insert(dedupedRecipeRows)
-    if (error) return NextResponse.json({ error: `레시피 저장 실패: ${error.message}` }, { status: 500 })
+    if (error) throw new UploadError()
   }
 
   // ─── 5. packaging_sets + items ───
@@ -344,7 +353,7 @@ export async function POST(req: NextRequest) {
         })
         .select('id')
         .single()
-      if (error) return NextResponse.json({ error: `포장세트 저장 실패: ${error.message}` }, { status: 500 })
+      if (error) throw new UploadError()
       setId = created!.id
     }
     const items = info.items
@@ -366,23 +375,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 업로드 히스토리
-  await supabase.from('upload_history').insert({
-    file_name: file.name,
-    file_type: 'recipe',
-    status: 'success',
-  })
-
-  return NextResponse.json({
-    ok: true,
-    stats: {
-      ingredientCount: ingredients.length,
-      pricedCount: priceRows.length,
-      subRecipeCount: subRecipePayload.length,
-      subRecipeItemCount: subItemRows.length,
-      recipeMenuCount: menuKeys.length,
-      recipeItemCount: dedupedRecipeRows.length,
-      packagingSetCount: packBySet.size,
-    },
-  })
+  return {
+    ingredientCount: ingredients.length,
+    pricedCount: priceRows.length,
+    subRecipeCount: subRecipePayload.length,
+    subRecipeItemCount: subItemRows.length,
+    recipeMenuCount: menuKeys.length,
+    recipeItemCount: dedupedRecipeRows.length,
+    packagingSetCount: packBySet.size,
+  }
 }
