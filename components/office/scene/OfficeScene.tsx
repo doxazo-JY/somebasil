@@ -35,6 +35,8 @@ type Char = {
   restTimer: number // 다음 이동까지 남은 시간(초)
 }
 
+// 1초에 15번만 그림 (픽셀 그림이라 충분, 화면 밖이면 멈춤) — 60번 그리면 페이지가 버벅임
+const FRAME_MS = 1000 / 15
 const WALK_SPEED = 2 // 칸/초 — 걷는 게 눈에 보이게 천천히
 const SIT_OFFSET = 6 // 앉으면 6px 아래로 (Pixel Agents 값)
 const FRAME_W = 16
@@ -99,6 +101,11 @@ export default function OfficeScene({ agents, selected, onSelect }: {
     const canvas = canvasRef.current
     if (!canvas) return
     let raf = 0
+    // 화면에 보일 때만 그림
+    let visible = true
+    const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting))
+    io.observe(canvas)
+    const sizes = new WeakMap<HTMLElement, { text: string; w: number; h: number }>()
     let alive = true
     const walk = buildWalkable()
     const chars = new Map<string, Char>()
@@ -204,6 +211,11 @@ export default function OfficeScene({ agents, selected, onSelect }: {
 
       const frame = (now: number) => {
         if (!alive) return
+        if (!visible || now - last < FRAME_MS) {
+          if (!visible) last = now // 다시 보일 때 그동안 시간만큼 한꺼번에 움직이지 않게
+          raf = requestAnimationFrame(frame)
+          return
+        }
         const dt = Math.min(0.1, (now - last) / 1000)
         last = now
         ensureChars()
@@ -322,8 +334,14 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           const sitOff = sitting ? (ch.target === 'seat' ? DESK_SIT_OFFSET : SIT_OFFSET) : 0
           const ay = ch ? (ch.y + 1) * TILE - FRAME_H + sitOff - 4 : seat.row * TILE - 2
           // 가운데·아래 맞춤까지 정수 px로 — 소수 px 위치면 글자가 뿌옇게 보임
-          const w = el.offsetWidth
-          const h = el.offsetHeight
+          // 이름표 크기는 글자가 바뀔 때만 다시 잼 (매번 재면 레이아웃 계산이 반복됨)
+          let size = sizes.get(el)
+          const key = `${el.textContent}|${canvas.clientWidth}`
+          if (!size || size.text !== key) {
+            size = { text: key, w: el.offsetWidth, h: el.offsetHeight }
+            sizes.set(el, size)
+          }
+          const { w, h } = size
           // 사무실 밖으로 잘리지 않게 좌우 안쪽으로
           const maxX = canvas.clientWidth - w - 2
           wanted.push({ el, x: Math.max(2, Math.min(maxX, Math.round(ax * cssScale - w / 2))), y: Math.round(ay * cssScale - h), w, h })
@@ -381,6 +399,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
       alive = false
       cancelAnimationFrame(raf)
       ro.disconnect()
+      io.disconnect()
       canvas.removeEventListener('click', onClick)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
