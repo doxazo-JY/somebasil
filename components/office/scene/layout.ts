@@ -30,6 +30,7 @@ export type Furniture = {
   fh: number // 발자국 세로 타일
   bg?: number // 발자국 위쪽 몇 행이 지나갈 수 있는 배경인지
   onWall?: boolean // 벽에 거는 물건 (걸음 막지 않음)
+  dx?: number // 그림 가로 보정(px)
   dy?: number // 그림 세로 보정(px) — 책상 위 물건 등
   z?: number // 그리기 순서 보정
   flip?: boolean // 좌우 뒤집기 (반대쪽을 보는 의자)
@@ -50,7 +51,8 @@ function deskSet(col: number, row: number, extras: Furniture[] = [], w = 3): Fur
   return [
     { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_FRONT.png`, col: mid, row: row - 2, fw: 1, fh: 2, bg: 1, dy: 8, z: -1 },
     { src: w === 5 ? `${CAFE}/RECEPTION.png` : `${F}/DESK/DESK_FRONT.png`, col, row, fw: w, fh: 2, bg: 0 },
-    { src: `${F}/PC/PC_BACK.png`, col: mid + 1, row, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
+    // 모니터는 오른쪽 칸에 두되 책상 끝(그림 45px)을 넘지 않게 왼쪽으로 5px
+    { src: `${F}/PC/PC_BACK.png`, col: mid + 1, row, fw: 1, fh: 1, bg: 1, dx: -5, dy: 9, z: ON_TOP },
     ...extras,
   ]
 }
@@ -73,25 +75,24 @@ export const FURNITURE: Furniture[] = [
   { src: `${CAFE}/CAKE_CASE.png`, col: 3, row: 3, fw: 1, fh: 1, bg: 1, dy: -2, z: ON_TOP },
   { src: `${CAFE}/CAKE_CASE.png`, col: 4, row: 3, fw: 1, fh: 1, bg: 1, dy: -2, z: ON_TOP },
   { src: `${F}/PLANT/PLANT.png`, col: 6, row: 2, fw: 1, fh: 2, bg: 1 },
-  // ── 카페 테이블 2개 (양옆 의자)
-  { src: `${F}/SMALL_TABLE/SMALL_TABLE_FRONT.png`, col: 2, row: 7, fw: 2, fh: 2, bg: 1 },
-  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 1, row: 7, fw: 1, fh: 2, bg: 1, z: -1 },
-  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 4, row: 7, fw: 1, fh: 2, bg: 1, z: -1, flip: true },
-  { src: `${F}/SMALL_TABLE/SMALL_TABLE_FRONT.png`, col: 2, row: 11, fw: 2, fh: 2, bg: 1 },
-  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 1, row: 11, fw: 1, fh: 2, bg: 1, z: -1 },
-  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 4, row: 11, fw: 1, fh: 2, bg: 1, z: -1, flip: true },
-  { src: `${F}/COFFEE/COFFEE.png`, col: 2, row: 7, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
-  { src: `${F}/COFFEE/COFFEE.png`, col: 3, row: 11, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
+  // ── 카페 테이블 2개 — 엇갈리게 (왼쪽 위 / 오른쪽 아래), 양옆 의자
+  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 0, row: 7, fw: 1, fh: 2, bg: 1, z: -1 },
+  { src: `${F}/SMALL_TABLE/SMALL_TABLE_FRONT.png`, col: 1, row: 7, fw: 2, fh: 2, bg: 1 },
+  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 3, row: 7, fw: 1, fh: 2, bg: 1, z: -1, flip: true },
+  { src: `${F}/COFFEE/COFFEE.png`, col: 1, row: 7, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
+  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 3, row: 10, fw: 1, fh: 2, bg: 1, z: -1 },
+  { src: `${F}/SMALL_TABLE/SMALL_TABLE_FRONT.png`, col: 4, row: 10, fw: 2, fh: 2, bg: 1 },
+  { src: `${F}/WOODEN_CHAIR/WOODEN_CHAIR_SIDE.png`, col: 6, row: 10, fw: 1, fh: 2, bg: 1, z: -1, flip: true },
+  { src: `${F}/COFFEE/COFFEE.png`, col: 5, row: 10, fw: 1, fh: 1, bg: 1, dy: 9, z: ON_TOP },
   // ── 마주 보는 소파 (앞모습 소파 · 테이블 · 뒷모습 소파) — 뒷모습 소파는 앉은 사람보다 앞에 그림
-  { src: `${F}/SOFA/SOFA_FRONT.png`, col: 5, row: 13, fw: 2, fh: 1, bg: 0, z: -1 },
-  { src: `${F}/COFFEE_TABLE/COFFEE_TABLE.png`, col: 5, row: 14, fw: 2, fh: 2 },
-  { src: `${F}/SOFA/SOFA_BACK.png`, col: 5, row: 16, fw: 2, fh: 1, bg: 0, z: 1 },
-  { src: `${F}/LARGE_PLANT/LARGE_PLANT.png`, col: 0, row: 14, fw: 2, fh: 3, bg: 2 },
-  { src: `${F}/CUSHIONED_BENCH/CUSHIONED_BENCH.png`, col: 6, row: 9, fw: 1, fh: 1 },
-  { src: `${F}/POT/POT.png`, col: 3, row: 16, fw: 1, fh: 1 },
+  { src: `${F}/SOFA/SOFA_FRONT.png`, col: 1, row: 13, fw: 2, fh: 1, bg: 0, z: -1 },
+  { src: `${F}/COFFEE_TABLE/COFFEE_TABLE.png`, col: 1, row: 14, fw: 2, fh: 2 },
+  { src: `${F}/SOFA/SOFA_BACK.png`, col: 1, row: 16, fw: 2, fh: 1, bg: 0, z: 1 },
+  { src: `${F}/LARGE_PLANT/LARGE_PLANT.png`, col: 5, row: 14, fw: 2, fh: 3, bg: 2 },
+  { src: `${F}/PLANT_2/PLANT_2.png`, col: 7, row: 7, fw: 1, fh: 2, bg: 1 },
+  { src: `${F}/POT/POT.png`, col: 0, row: 11, fw: 1, fh: 1 },
   // 카페 / 일하는 곳 경계 화분
-  { src: `${F}/PLANT_2/PLANT_2.png`, col: 7, row: 6, fw: 1, fh: 2, bg: 1 },
-  { src: `${F}/CACTUS/CACTUS.png`, col: 7, row: 11, fw: 1, fh: 2, bg: 1 },
+  { src: `${F}/CACTUS/CACTUS.png`, col: 7, row: 12, fw: 1, fh: 2, bg: 1 },
 
   // ── 일하는 곳 벽 (안내 데스크 위에 시계)
   { src: `${F}/WHITEBOARD/WHITEBOARD.png`, col: 10, row: 0, fw: 2, fh: 2, onWall: true },
@@ -159,15 +160,15 @@ export const DESK_SIT_OFFSET = 16
 
 // 카페 쉬는 자리 — sit: 앉음, 아니면 서 있음 / dir: 보는 방향
 export const REST_SPOTS: { col: number; row: number; sit: boolean; dir: 'down' | 'up' | 'right' | 'left' }[] = [
-  { col: 1, row: 8, sit: true, dir: 'right' }, // 테이블1 왼쪽 의자
-  { col: 4, row: 12, sit: true, dir: 'left' }, // 테이블2 오른쪽 의자
-  { col: 5, row: 13, sit: true, dir: 'down' }, // 소파(앞모습)
-  { col: 6, row: 16, sit: true, dir: 'up' }, // 소파(뒷모습) — 마주 봄
+  { col: 0, row: 8, sit: true, dir: 'right' }, // 테이블1 왼쪽 의자
+  { col: 6, row: 11, sit: true, dir: 'left' }, // 테이블2 오른쪽 의자
+  { col: 1, row: 13, sit: true, dir: 'down' }, // 소파(앞모습)
+  { col: 2, row: 16, sit: true, dir: 'up' }, // 소파(뒷모습) — 마주 봄
   { col: 1, row: 5, sit: false, dir: 'up' }, // 카운터 앞 (주문)
-  { col: 4, row: 8, sit: true, dir: 'left' },
-  { col: 1, row: 12, sit: true, dir: 'right' },
-  { col: 6, row: 13, sit: true, dir: 'down' },
-  { col: 5, row: 16, sit: true, dir: 'up' },
+  { col: 3, row: 8, sit: true, dir: 'left' },
+  { col: 3, row: 11, sit: true, dir: 'right' },
+  { col: 2, row: 13, sit: true, dir: 'down' },
+  { col: 1, row: 16, sit: true, dir: 'up' },
   { col: 4, row: 5, sit: false, dir: 'up' },
 ]
 

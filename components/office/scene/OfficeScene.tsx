@@ -146,7 +146,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
 
       const furniture = FURNITURE.map((f) => {
         const im = img(f.src)
-        const x = f.col * TILE + Math.round((f.fw * TILE - im.width) / 2)
+        const x = f.col * TILE + Math.round((f.fw * TILE - im.width) / 2) + (f.dx ?? 0)
         const y = (f.row + f.fh) * TILE - im.height + (f.dy ?? 0)
         return { im, x, y, flip: !!f.flip, zY: (f.row + f.fh) * TILE + (f.z ?? 0) * 0.5 - (f.onWall ? 1000 : 0) }
       })
