@@ -158,7 +158,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
         setPreview({ type: 'menu', rows: json.rows as MenuRow[] })
       } else if (tab === 'worklog') {
         const r = json as WorklogParseResult
-        setPreview({ type: 'worklog', shifts: r.shifts, staff: r.staff, months: r.months, warnings: r.warnings })
+        setPreview({ type: 'worklog', shifts: r.shifts, staff: r.staff, months: r.months, payrollItems: r.payrollItems ?? [], warnings: r.warnings })
       }
     } catch (err) {
       // 네트워크 끊김 / 타임아웃 / JSON 파싱 실패 — 모바일에서 흔함
@@ -198,7 +198,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
       body: JSON.stringify({
         type: 'work_logs',
         filename,
-        worklog: { shifts: p.shifts, staff: p.staff, months: p.months },
+        worklog: { shifts: p.shifts, staff: p.staff, months: p.months, payrollItems: p.payrollItems },
       }),
     })
     const json = await safeJson(res)
@@ -208,7 +208,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
     } else {
       const created = (json.createdStaff as string[]) ?? []
       setMessage({
-        text: `저장 완료! 근무 ${json.savedShifts}건${created.length > 0 ? ` · 새 직원 ${created.join(', ')}` : ''}`,
+        text: `저장 완료! 근무 ${json.savedShifts}건${json.savedPayrollItems ? ` · 인건비 수기 항목 ${json.savedPayrollItems}건` : ''}${created.length > 0 ? ` · 새 직원 ${created.join(', ')}` : ''}`,
         ok: true,
       })
       setPreview(null)
@@ -367,6 +367,7 @@ export default function UploadSection({ bankExtras, menuExtras }: UploadSectionP
           shifts={preview.shifts}
           staff={preview.staff}
           months={preview.months}
+          payrollItems={preview.payrollItems}
           warnings={preview.warnings}
           saving={saving}
           onSave={() => handleSaveWorklog(preview)}

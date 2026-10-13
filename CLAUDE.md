@@ -97,14 +97,17 @@
 - `staff_devices` — 직원별 등록 폰 (token_hash = 쿠키 기기 토큰의 해시, revoked_at)
 - `attendance_logs` — 출퇴근 기록. clock_out null = 근무 중. qr_clock_* = QR 원래 시각 보존, edited_at = 점장 수정
 - `pay_rates` — 매장 공통 시급 이력 (평일 / 주일). effective_from <= 날짜 중 최신
-- `payroll_items` — 월 인건비 요약 수기 항목 (fixed_salary | weekly_holiday_pay | other)
+- `payroll_items` — 월 인건비 요약 수기 항목 (fixed_salary | weekly_holiday_pay | other). source: 'manual'(점장 입력) | 'worklog'(근무일지 업로드 시 각 시트 "○월분 총 인건비" 칸의 고정급·주휴 줄 — 재업로드 시 그 달 worklog 행만 교체)
 - `staff.link_token_hash / link_token_expires_at` — 폰 교체 시 점장이 만드는 연결 QR (10분, 1회용)
 - `system_settings.attendance_qr_secret` — 카운터 고정 QR 비밀값
 - 첫 스캔 = 새 직원 등록만 (이름 입력, 기존 이름이면 차단). 기존 직원 연결은 점장 연결 QR로만. PIN 없음
 - 출퇴근은 버튼 방식. 카운터 QR(`/clock?k=`)을 찍으면 3분 입장권 쿠키(`sb_ticket`, HMAC 서명 키 = QR 비밀값) 발급 + 주소에서 k 제거 → 버튼 1회 사용 후 소멸. 링크·열어 둔 탭은 현황만
 - 직원용 주소 분리: `NEXT_PUBLIC_CLOCK_ORIGIN`(Vercel 환경변수)으로 들어온 요청은 `proxy.ts`가 `/clock`·`/api/clock/*`만 허용, 나머지 404. 카운터 QR·연결 QR은 이 주소로 생성. 미설정 시 제한 없음
 - 근무 중 = 16시간 이내 시작된 퇴근 전 기록. 그보다 오래되면 퇴근 누락 (v2: 근무 중 기록 직원·날짜당 1건)
-- QR용으로 work_logs를 쓰지 않은 이유: 퇴근 전 상태 저장 불가, 자정 넘김 계산 오류
+- QR용으로 work_logs를 쓰지 않은 이유: 퇴근 전 상태 저장 불가, 자정 넘김 계산 오류. 업로드가 월 단위 delete→insert라 QR 기록을 넣으면 지워짐
+- **QR 기록 시작일** (`system_settings.attendance_qr_start_date`, 직원·설정 탭): 날짜 전 = work_logs(종이), 날짜부터 = attendance_logs(QR). 미설정 = 전부 종이 (병행 기간). `buildTimesheet()`가 날짜별로 합침 — 근무 탭 숫자·직원별 합계·근무일지 엑셀 모두 이 기준
+- 종이 근무일지의 주일 블록(1.5배)은 공휴일 포함 → work_logs는 일요일 또는 그달 최저 시급보다 확실히 높은 시급이면 주일로 분류
+- 근무일지 엑셀 = 누적 (기록 있는 첫 달 ~ 선택 달, 월마다 시트). 원본 파일과 12월~8월 주간·주일 금액 일치 확인 (10/14)
 
 ### daily_sales — POS 상품 라인 단위 매출
 - id, date, order_id, line_no, product_name, category, quantity, amount, order_time, source, created_at

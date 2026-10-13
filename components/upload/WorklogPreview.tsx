@@ -1,6 +1,6 @@
 'use client'
 
-import type { WorkShift, WorklogStaff } from '@/lib/worklog-parser'
+import type { WorkShift, WorklogStaff, WorklogPayrollItem } from '@/lib/worklog-parser'
 
 // 근무일지 미리보기 — 직원 × 월 근무시간/지급액 표
 
@@ -8,6 +8,7 @@ interface WorklogPreviewProps {
   shifts: WorkShift[]
   staff: WorklogStaff[]
   months: string[]
+  payrollItems: WorklogPayrollItem[]
   warnings: string[]
   saving: boolean
   onSave: () => void
@@ -17,7 +18,7 @@ function manwon(v: number) {
   return `${Math.round(v / 10000).toLocaleString()}만`
 }
 
-export default function WorklogPreview({ shifts, staff, months, warnings, saving, onSave }: WorklogPreviewProps) {
+export default function WorklogPreview({ shifts, staff, months, payrollItems, warnings, saving, onSave }: WorklogPreviewProps) {
   // 직원 × 월 집계
   const cell = new Map<string, { hours: number; pay: number }>()
   const monthTotal = new Map<string, number>()
@@ -93,9 +94,24 @@ export default function WorklogPreview({ shifts, staff, months, warnings, saving
         </table>
       </div>
 
+      {payrollItems.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-medium text-gray-500 mb-1.5">인건비 수기 항목 (각 시트의 &quot;총 인건비&quot; 칸)</p>
+          <ul className="text-xs text-gray-600 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
+            {payrollItems.map((p, i) => (
+              <li key={i} className="flex justify-between gap-2 tabular-nums">
+                <span className="text-gray-400">{Number(p.month.slice(5))}월</span>
+                <span className="flex-1 truncate">{p.label}</span>
+                <span>{p.amount.toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <p className="text-xs text-gray-400 mt-4 [word-break:keep-all]">
         저장하면 처음 보는 이름은 알바생으로 자동 등록됩니다. 같은 달을 다시 올리면 그 달 기록을 새 파일로 교체합니다.
-        지급액은 근무시간 × 시급 (주휴수당 제외).
+        지급액은 근무시간 × 시급 (주휴수당 제외). 고정급·주휴 줄은 직원 &gt; 근무 탭의 수기 항목으로 들어갑니다.
       </p>
     </div>
   )

@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 // @ts-expect-error — xlsx-populate는 타입 정의 없음
 import XlsxPopulate from 'xlsx-populate'
-import { buildTimesheet, type TimesheetBlock } from '@/lib/supabase/queries/attendance-admin'
+import {
+  buildTimesheet,
+  firstTimesheetMonth,
+  getPayRates,
+  getQrStartDate,
+  type Timesheet,
+  type TimesheetBlock,
+} from '@/lib/supabase/queries/attendance-admin'
 import { fmtTime, fmtWorkDate, isSunday } from '@/lib/attendance/format'
 
 // xlsx-populate는 Node 전용
 export const runtime = 'nodejs'
 
-// 점장(관리 화면): 월 근무일지 엑셀 — 세무사 전달용. 관리 화면 로그인 대상
-// 지금 쓰는 "썸바실 YY년 M월 P.T. 근무일지"와 같은 구조:
-//   평일 근무 블록 → 주일 근무 블록 → M월분 총 인건비(세전) 요약
+// 점장(관리 화면): 근무일지 엑셀 — 세무사 전달용. 관리 화면 로그인 대상
+// 지금 쓰는 파일처럼 누적: 기록이 있는 첫 달 ~ 선택한 달, 월마다 시트 하나 ("26년 10월")
+// 시트 구조 = "썸바실 YY년 M월 P.T. 근무일지": 평일 근무 블록 → 주일 근무 블록 → M월분 총 인건비(세전)
+// 날짜별 출처: QR 기록 시작일 전 = 종이 근무일지(업로드), 시작일부터 = QR (buildTimesheet 참고)
 // 계산은 값으로 넣음 (수식 아님 — 미리보기/모바일에서도 숫자가 보이도록)
 
 const KIND_LABEL = { fixed_salary: '고정급', weekly_holiday_pay: '주휴수당', other: '기타' } as const
@@ -98,6 +106,40 @@ function writeBlock(sh: Sheet, startRow: number, title: string, hourly: number |
   return r + 2
 }
 
+// 한 달 = 시트 하나
+function writeMonthSheet(sh: Sheet, ts: Timesheet) {
+  const { year, month } = ts
+  sh.name(`${String(year).slice(2)}년 ${month}월`)
+  sh.cell(1, 1).value(`썸바실 ${String(year).slice(2)}년 ${month}월 P.T. 근무일지`).style({ bold: true, fontSize: 14 })
+  if (ts.openCount > 0) {
+    sh.cell(2, 1).value(`※ 퇴근 기록이 없는 근무 ${ts.openCount}건은 근무시간에서 빠져 있습니다 (관리 화면에서 수정 후 다시 내려받기)`).style({ fontColor: 'C0392B' })
+  }
+
+  let r = 4
+  r = writeBlock(sh, r, '평일 근무', ts.rates.weekday, ts.weekday, ts.dates, false)
+  r = writeBlock(sh, r, '주일 근무', ts.rates.sunday, ts.sunday, ts.dates, true)
+
+  // 인건비 요약
+  sh.cell(r, 1).value(`${month}월분 총 인건비(세전)`).style({ bold: true, fontSize: 12 })
+  r++
+  const lines: [string, number][] = [
+    ['주간', ts.weekday.pay],
+    ['주일', ts.sunday.pay],
+    ...ts.payrollItems.map((i) => [`${i.label} (${KIND_LABEL[i.kind]})`, i.amount] as [string, number]),
+  ]
+  for (const [label, amount] of lines) {
+    sh.cell(r, 1).value(label).style(BODY)
+    sh.cell(r, 2).value(amount).style({ ...BODY, numberFormat: '#,##0', horizontalAlignment: 'right' })
+    r++
+  }
+  sh.cell(r, 1).value('합계').style(HEAD)
+  sh.cell(r, 2).value(ts.total).style({ ...HEAD, numberFormat: '#,##0', horizontalAlignment: 'right' })
+
+  const staffCols = Math.max(ts.weekday.staff.length, ts.sunday.staff.length) * 3 + 1
+  sh.column(1).width(14)
+  for (let c = 2; c <= Math.max(staffCols, 4); c++) sh.column(c).width(10)
+}
+
 export async function GET(req: NextRequest) {
   const year = Number(req.nextUrl.searchParams.get('year'))
   const month = Number(req.nextUrl.searchParams.get('month'))
@@ -106,42 +148,28 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const ts = await buildTimesheet(year, month)
+    // 첫 달 ~ 선택한 달
+    const first = (await firstTimesheetMonth()) ?? { year, month }
+    const months: { year: number; month: number }[] = []
+    for (let y = first.year, m = first.month; y < year || (y === year && m <= month); m === 12 ? (y++, (m = 1)) : m++) {
+      months.push({ year: y, month: m })
+    }
+    if (months.length === 0) months.push({ year, month })
+
+    const [rates, qrStart] = await Promise.all([getPayRates(), getQrStartDate()])
+    const sheets: Timesheet[] = []
+    for (const m of months) sheets.push(await buildTimesheet(m.year, m.month, { rates, qrStart }))
+
     const wb = await XlsxPopulate.fromBlankAsync()
-    const sh: Sheet = wb.sheet(0)
-    sh.name(`${String(year).slice(2)}년 ${month}월`)
-
-    sh.cell(1, 1).value(`썸바실 ${String(year).slice(2)}년 ${month}월 P.T. 근무일지`).style({ bold: true, fontSize: 14 })
-    if (ts.openCount > 0) {
-      sh.cell(2, 1).value(`※ 퇴근 기록이 없는 근무 ${ts.openCount}건은 근무시간에서 빠져 있습니다 (관리 화면에서 수정 후 다시 내려받기)`).style({ fontColor: 'C0392B' })
-    }
-
-    let r = 4
-    r = writeBlock(sh, r, '평일 근무', ts.rates.weekday, ts.weekday, ts.dates, false)
-    r = writeBlock(sh, r, '주일 근무', ts.rates.sunday, ts.sunday, ts.dates, true)
-
-    // 인건비 요약
-    sh.cell(r, 1).value(`${month}월분 총 인건비(세전)`).style({ bold: true, fontSize: 12 })
-    r++
-    const lines: [string, number][] = [
-      ['주간', ts.weekday.pay],
-      ['주일', ts.sunday.pay],
-      ...ts.payrollItems.map((i) => [`${i.label} (${KIND_LABEL[i.kind]})`, i.amount] as [string, number]),
-    ]
-    for (const [label, amount] of lines) {
-      sh.cell(r, 1).value(label).style(BODY)
-      sh.cell(r, 2).value(amount).style({ ...BODY, numberFormat: '#,##0', horizontalAlignment: 'right' })
-      r++
-    }
-    sh.cell(r, 1).value('합계').style(HEAD)
-    sh.cell(r, 2).value(ts.total).style({ ...HEAD, numberFormat: '#,##0', horizontalAlignment: 'right' })
-
-    const staffCols = Math.max(ts.weekday.staff.length, ts.sunday.staff.length) * 3 + 1
-    sh.column(1).width(14)
-    for (let c = 2; c <= Math.max(staffCols, 4); c++) sh.column(c).width(10)
+    sheets.forEach((ts, i) => {
+      const sh: Sheet = i === 0 ? wb.sheet(0) : wb.addSheet(`${String(ts.year).slice(2)}년 ${ts.month}월`)
+      writeMonthSheet(sh, ts)
+    })
+    // 열었을 때 선택한 달 시트가 보이도록
+    wb.activeSheet(wb.sheet(sheets.length - 1))
 
     const buf: Buffer = await wb.outputAsync()
-    const filename = `썸바실_근무일지_${year}-${String(month).padStart(2, '0')}.xlsx`
+    const filename = `썸바실_근무일지_~${year}-${String(month).padStart(2, '0')}.xlsx`
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

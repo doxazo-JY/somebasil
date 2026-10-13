@@ -74,7 +74,7 @@ export default async function StaffPage({ searchParams }: PageProps) {
   const settings = (
     <div className="space-y-4">
       <StaffDeviceList staff={staff} />
-      <AttendanceSettings qrSecret={qrSecret} rates={rates} />
+      <AttendanceSettings qrSecret={qrSecret} rates={rates} qrStart={timesheet.qrStart} />
     </div>
   )
 

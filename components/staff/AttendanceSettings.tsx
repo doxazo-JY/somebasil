@@ -7,12 +7,61 @@ import type { PayRate } from '@/lib/supabase/queries/attendance-admin'
 
 const INPUT = 'text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]'
 
-// 카운터 QR + 매장 공통 시급 (직원·설정 탭 아래쪽)
-export default function AttendanceSettings({ qrSecret, rates }: { qrSecret: string | null; rates: PayRate[] }) {
+// QR 기록 시작일 + 카운터 QR + 매장 공통 시급 (직원·설정 탭 아래쪽)
+export default function AttendanceSettings({ qrSecret, rates, qrStart }: { qrSecret: string | null; rates: PayRate[]; qrStart: string | null }) {
   return (
-    <div className="grid md:grid-cols-2 gap-4 items-start">
-      <CounterQr qrSecret={qrSecret} />
-      <PayRates rates={rates} />
+    <div className="space-y-4">
+      <QrStartDate qrStart={qrStart} />
+      <div className="grid md:grid-cols-2 gap-4 items-start">
+        <CounterQr qrSecret={qrSecret} />
+        <PayRates rates={rates} />
+      </div>
+    </div>
+  )
+}
+
+// 근무일지·인건비 계산 출처 전환점
+function QrStartDate({ qrStart }: { qrStart: string | null }) {
+  const router = useRouter()
+  const [date, setDate] = useState(qrStart ?? '')
+  const [saving, setSaving] = useState(false)
+
+  async function save(value: string | null) {
+    setSaving(true)
+    await fetch('/api/attendance/qr-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: value }),
+    })
+    setSaving(false)
+    router.refresh()
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="flex-1 min-w-[240px]">
+        <p className="text-sm font-semibold text-gray-800">
+          QR 기록 시작일 <span className="ml-1 text-xs font-normal text-gray-500">{qrStart ? `${qrStart}부터 QR` : '미설정 · 전부 종이 근무일지'}</span>
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
+          이 날짜 전은 업로드한 종이 근무일지, 이 날짜부터는 QR 출퇴근으로 인건비와 근무일지 엑셀을 만들어요. 병행 기간에는 비워 두세요.
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input id="qr-start-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={INPUT} />
+        <button
+          onClick={() => save(date)}
+          disabled={saving || !date || date === qrStart}
+          className="text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-40"
+        >
+          저장
+        </button>
+        {qrStart && (
+          <button onClick={() => { setDate(''); save(null) }} disabled={saving} className="text-xs px-3 py-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+            해제
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -27,12 +27,46 @@ export interface WorklogStaff {
   lastDate: string
 }
 
+/** 시트 아래 "○월분 총 인건비(세전)" 칸의 수기 줄 (점장·매니저 고정급, ○○ 주휴 등) */
+export interface WorklogPayrollItem {
+  month: string // 'YYYY-MM' (시트 기준 — 칸 제목의 월은 복사 실수로 틀린 경우가 있어 무시)
+  kind: 'fixed_salary' | 'weekly_holiday_pay' | 'other'
+  label: string
+  amount: number
+}
+
 export interface WorklogParseResult {
   shifts: WorkShift[]
   staff: WorklogStaff[]
   /** 'YYYY-MM' 오름차순 */
   months: string[]
+  payrollItems: WorklogPayrollItem[]
   warnings: string[]
+}
+
+// "주간"/"주일"은 근무 기록으로 계산되는 줄이라 제외. 라벨 없는 줄 = 합계
+const COMPUTED_LINES = new Set(['주간', '주일', '합계', '총 합계'])
+
+function payrollKind(label: string): WorklogPayrollItem['kind'] {
+  if (label.includes('주휴')) return 'weekly_holiday_pay'
+  if (/점장|매니저/.test(label)) return 'fixed_salary'
+  return 'other'
+}
+
+// 시트에서 "총 인건비" 칸을 찾아 라벨/금액 줄 읽기
+function parsePayrollSummary(rows: Cell[][], month: string): WorklogPayrollItem[] {
+  const titleRow = rows.findIndex((r) => (r ?? []).some((c) => cellText(c).includes('총 인건비')))
+  if (titleRow < 0) return []
+  const col = (rows[titleRow] ?? []).findIndex((c) => cellText(c).includes('총 인건비'))
+  const items: WorklogPayrollItem[] = []
+  for (let r = titleRow + 1; r < Math.min(rows.length, titleRow + 15); r++) {
+    const label = cellText(rows[r]?.[col])
+    const amount = parseRate(rows[r]?.[col + 1])
+    if (!label && amount === null) continue
+    if (!label || COMPUTED_LINES.has(label) || amount === null) continue
+    items.push({ month, kind: payrollKind(label), label, amount })
+  }
+  return items
 }
 
 type Cell = string | null
@@ -77,6 +111,7 @@ export function parseWorklog(buffer: ArrayBuffer): WorklogParseResult {
 
 export function parseWorklogBook(wb: XLSX.WorkBook): WorklogParseResult {
   const shifts: WorkShift[] = []
+  const payrollItems: WorklogPayrollItem[] = []
   const warnings: string[] = []
 
   for (const sheetName of wb.SheetNames) {
@@ -89,6 +124,7 @@ export function parseWorklogBook(wb: XLSX.WorkBook): WorklogParseResult {
       raw: false,
       defval: null,
     })
+    payrollItems.push(...parsePayrollSummary(rows, `${year}-${ym[2].padStart(2, '0')}`))
 
     // 블록 상태
     let people: { col: number; name: string }[] = []
@@ -182,5 +218,5 @@ export function parseWorklogBook(wb: XLSX.WorkBook): WorklogParseResult {
   }
 
   const months = [...new Set(shifts.map((s) => s.date.slice(0, 7)))].sort()
-  return { shifts, staff: [...byName.values()], months, warnings }
+  return { shifts, staff: [...byName.values()], months, payrollItems, warnings }
 }

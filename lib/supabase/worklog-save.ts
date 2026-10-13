@@ -1,5 +1,5 @@
 import type { createServerClient } from './server'
-import type { WorkShift, WorklogStaff } from '@/lib/worklog-parser'
+import type { WorkShift, WorklogStaff, WorklogPayrollItem } from '@/lib/worklog-parser'
 
 type Supabase = ReturnType<typeof createServerClient>
 
@@ -7,12 +7,14 @@ type Supabase = ReturnType<typeof createServerClient>
 // 1) 직원 이름으로 staff 매칭 — 없으면 알바생(part_time)으로 자동 등록
 // 2) 파일에 포함된 월 × 파일 속 직원의 work_logs를 지우고 다시 넣음 (같은 파일 재업로드해도 중복 X)
 // 3) staff_salary = 월별 Σ(근무시간 × 블록 시급). 주휴수당 미포함 — 근무일지 "총 지급액"과 같은 기준
+// 4) "○월분 총 인건비" 칸의 고정급·주휴 줄 → payroll_items(source='worklog'). 파일 속 월의 worklog 출처 행만 교체
 export async function saveWorklog(
   supabase: Supabase,
   shifts: WorkShift[],
   staffSummary: WorklogStaff[],
   months: string[],
-): Promise<{ createdStaff: string[]; savedShifts: number }> {
+  payrollItems: WorklogPayrollItem[] = [],
+): Promise<{ createdStaff: string[]; savedShifts: number; savedPayrollItems: number }> {
   const latestMonth = months[months.length - 1]
 
   // 1) 직원 매칭/등록
@@ -93,5 +95,27 @@ export async function saveWorklog(
     if (error) throw error
   }
 
-  return { createdStaff, savedShifts: inserts.length }
+  // 4) 인건비 수기 줄
+  for (const ym of months) {
+    const [y, m] = ym.split('-').map(Number)
+    const { error } = await supabase
+      .from('payroll_items')
+      .delete()
+      .eq('year', y)
+      .eq('month', m)
+      .eq('source', 'worklog')
+    if (error) throw error
+  }
+  const itemRows = payrollItems
+    .filter((p) => months.includes(p.month))
+    .map((p) => {
+      const [year, month] = p.month.split('-').map(Number)
+      return { year, month, kind: p.kind, label: p.label, amount: p.amount, source: 'worklog' }
+    })
+  if (itemRows.length > 0) {
+    const { error } = await supabase.from('payroll_items').insert(itemRows)
+    if (error) throw error
+  }
+
+  return { createdStaff, savedShifts: inserts.length, savedPayrollItems: itemRows.length }
 }

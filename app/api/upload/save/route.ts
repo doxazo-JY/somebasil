@@ -4,7 +4,7 @@ import { recalcMonthlySummary } from '@/lib/supabase/recalc'
 import type { DailySalesRow } from '../daily-sales/route'
 import type { BankRow } from '../bank/route'
 import type { MenuRow } from '../menu/route'
-import type { WorkShift, WorklogStaff } from '@/lib/worklog-parser'
+import type { WorkShift, WorklogStaff, WorklogPayrollItem } from '@/lib/worklog-parser'
 import { saveWorklog } from '@/lib/supabase/worklog-save'
 
 export async function POST(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     rows: (DailySalesRow | BankRow | MenuRow)[]
     filename: string
     /** type='work_logs' 전용 */
-    worklog?: { shifts: WorkShift[]; staff: WorklogStaff[]; months: string[] }
+    worklog?: { shifts: WorkShift[]; staff: WorklogStaff[]; months: string[]; payrollItems?: WorklogPayrollItem[] }
   }
 
   const supabase = createServerClient()
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (type === 'work_logs') {
     if (!worklog) return NextResponse.json({ error: '근무 기록이 없습니다.' }, { status: 400 })
     try {
-      const result = await saveWorklog(supabase, worklog.shifts, worklog.staff, worklog.months)
+      const result = await saveWorklog(supabase, worklog.shifts, worklog.staff, worklog.months, worklog.payrollItems ?? [])
       await supabase.from('upload_history').insert({
         file_name: filename,
         file_type: type,

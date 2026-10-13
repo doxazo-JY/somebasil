@@ -1,5 +1,5 @@
 import { createServerClient } from '../server'
-import { isSunday } from '@/lib/attendance/format'
+import { isSunday, kstIso } from '@/lib/attendance/format'
 
 // 점장 관리 화면(/staff)용 출퇴근 쿼리
 
@@ -123,14 +123,24 @@ export function rateFor(rates: PayRate[], workDate: string): PayRate | null {
   return rates.find((r) => r.effective_from <= workDate) ?? null
 }
 
+
+// QR 기록 시작일 — 이 날짜 전은 종이 근무일지(work_logs 업로드), 이 날짜부터는 QR(attendance_logs)
+// 미설정이면 전부 종이 근무일지 (병행 기간)
+export async function getQrStartDate(): Promise<string | null> {
+  const supabase = createServerClient()
+  const { data } = await supabase.from('system_settings').select('value').eq('key', 'attendance_qr_start_date').maybeSingle()
+  return typeof data?.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.value) ? data.value : null
+}
+
 // ─────────────────────────────────────────────
 // 근무일지 — 지금 쓰는 P.T. 근무일지 엑셀과 같은 구조
 //   평일 근무 / 주일 근무 블록, 직원별 출근·퇴근·근무시간, 근무일수·근무시간·지급액
-//   대상: 알바생(part_time) 중 그달 기록이 있는 직원
+//   대상: 알바생(part_time)
+//   날짜별 출처: QR 시작일 전 = 종이 근무일지(work_logs), 시작일부터 = QR(attendance_logs)
 // ─────────────────────────────────────────────
 
 export type TimesheetDay = {
-  clock_in: string        // 그날 첫 출근
+  clock_in: string        // 그날 첫 출근 (ISO)
   clock_out: string | null // 그날 마지막 퇴근 (근무 중/누락이면 null)
   minutes: number          // 그날 근무 분 합계 (퇴근 기록된 것만)
   open: boolean            // 퇴근 기록 없는 근무가 있음
@@ -149,27 +159,108 @@ export type Timesheet = {
   dates: string[] // 그달 모든 날짜
   weekday: TimesheetBlock
   sunday: TimesheetBlock
-  rates: { weekday: number | null; sunday: number | null } // 그달 말일 기준 (표시용)
-  missingRateDates: string[] // 시급이 등록 안 된 근무 날짜
-  openCount: number          // 퇴근 누락 건수
+  rates: { weekday: number | null; sunday: number | null } // 표시용 (그달 기록의 시급, 없으면 시급 이력)
+  qrStart: string | null     // QR 기록 시작일
+  missingRateDates: string[] // 시급을 알 수 없는 근무 날짜
+  openCount: number          // 퇴근 누락 건수 (QR)
   payrollItems: PayrollItem[]
   total: number              // 평일 + 주일 + 수기 항목
 }
 
-export async function buildTimesheet(year: number, month: number): Promise<Timesheet> {
+// 근무 한 건 (출처 무관 공통 형태)
+type Shift = {
+  staff_id: number
+  name: string
+  work_date: string
+  clock_in: string
+  clock_out: string | null
+  minutes: number
+  rate: number | null
+  sunday: boolean
+}
+
+type StaffJoin = { id: number; name: string; role: string } | null
+
+async function paperShifts(start: string, end: string, qrStart: string | null): Promise<Shift[]> {
   const supabase = createServerClient()
+  const until = qrStart && qrStart < end ? qrStart : end
+  if (until <= start) return []
+  const { data, error } = await supabase
+    .from('work_logs')
+    .select('staff_id, date, start_time, end_time, hours_worked, hourly_rate, staff:staff_id (id, name, role)')
+    .gte('date', start)
+    .lt('date', until)
+    .order('date')
+    .order('start_time')
+  if (error) throw error
+  const rows = (data ?? []).filter((r) => (r as unknown as { staff: StaffJoin }).staff?.role === 'part_time')
+  // 종이 근무일지는 공휴일도 주일 블록(1.5배) → 그달 최저 시급보다 확실히 높으면 주일로 봄
+  const rates = rows.map((r) => Number(r.hourly_rate)).filter((n) => n > 0)
+  const minRate = rates.length ? Math.min(...rates) : 0
+  return rows.map((r) => {
+    const staff = (r as unknown as { staff: StaffJoin }).staff!
+    const inHm = String(r.start_time).slice(0, 5)
+    const outHm = String(r.end_time).slice(0, 5)
+    const clockIn = kstIso(r.date, inHm)
+    let clockOut = kstIso(r.date, outHm)
+    if (clockOut <= clockIn) clockOut = new Date(new Date(clockOut).getTime() + 86400000).toISOString()
+    const rate = Number(r.hourly_rate) > 0 ? Number(r.hourly_rate) : null
+    return {
+      staff_id: staff.id,
+      name: staff.name,
+      work_date: r.date,
+      clock_in: clockIn,
+      clock_out: clockOut,
+      minutes: Math.round(Number(r.hours_worked ?? 0) * 60),
+      rate,
+      sunday: isSunday(r.date) || (rate !== null && minRate > 0 && rate > minRate * 1.2),
+    }
+  })
+}
+
+async function qrShifts(start: string, end: string, qrStart: string | null, rates: PayRate[]): Promise<Shift[]> {
+  if (!qrStart || qrStart >= end) return []
+  const supabase = createServerClient()
+  const from = qrStart > start ? qrStart : start
+  const { data, error } = await supabase
+    .from('attendance_logs')
+    .select('staff_id, work_date, clock_in, clock_out, minutes_worked, staff:staff_id (id, name, role)')
+    .gte('work_date', from)
+    .lt('work_date', end)
+    .order('clock_in')
+  if (error) throw error
+  return (data ?? [])
+    .filter((r) => (r as unknown as { staff: StaffJoin }).staff?.role === 'part_time')
+    .map((r) => {
+      const staff = (r as unknown as { staff: StaffJoin }).staff!
+      const sunday = isSunday(r.work_date)
+      const rate = rateFor(rates, r.work_date)
+      return {
+        staff_id: staff.id,
+        name: staff.name,
+        work_date: r.work_date,
+        clock_in: r.clock_in,
+        clock_out: r.clock_out,
+        minutes: r.minutes_worked ?? 0,
+        rate: rate ? (sunday ? rate.sunday_hourly : rate.weekday_hourly) : null,
+        sunday,
+      }
+    })
+}
+
+export async function buildTimesheet(
+  year: number,
+  month: number,
+  pre?: { rates: PayRate[]; qrStart: string | null }
+): Promise<Timesheet> {
   const { start, end } = monthRange(year, month)
-  const [{ data: logs, error }, rates, payrollItems] = await Promise.all([
-    supabase
-      .from('attendance_logs')
-      .select('staff_id, work_date, clock_in, clock_out, minutes_worked, staff:staff_id (id, name, role)')
-      .gte('work_date', start)
-      .lt('work_date', end)
-      .order('clock_in'),
-    getPayRates(),
+  const rates = pre?.rates ?? (await getPayRates())
+  const qrStart = pre ? pre.qrStart : await getQrStartDate()
+  const [paper, qr, payrollItems] = await Promise.all([
+    paperShifts(start, end, qrStart),
+    qrShifts(start, end, qrStart, rates),
     getPayrollItems(year, month),
   ])
-  if (error) throw error
 
   const dates: string[] = []
   for (let d = new Date(`${start}T00:00:00Z`); d.toISOString().slice(0, 10) < end; d = new Date(d.getTime() + 86400000)) {
@@ -179,40 +270,36 @@ export async function buildTimesheet(year: number, month: number): Promise<Times
   const emptyBlock = (): TimesheetBlock => ({ staff: [], days: {}, totals: {}, pay: 0 })
   const weekday = emptyBlock()
   const sunday = emptyBlock()
+  const blockRates = { weekday: new Set<number>(), sunday: new Set<number>() }
   const missing = new Set<string>()
   let openCount = 0
 
-  for (const row of logs ?? []) {
-    const s = (row as unknown as { staff: { id: number; name: string; role: string } | null }).staff
-    if (!s || s.role !== 'part_time') continue
-    const block = isSunday(row.work_date) ? sunday : weekday
-    if (!block.days[s.id]) {
-      block.staff.push({ id: s.id, name: s.name })
-      block.days[s.id] = {}
-      block.totals[s.id] = { days: 0, minutes: 0, pay: 0 }
+  for (const s of [...paper, ...qr].sort((a, b) => a.clock_in.localeCompare(b.clock_in))) {
+    const block = s.sunday ? sunday : weekday
+    if (!block.days[s.staff_id]) {
+      block.staff.push({ id: s.staff_id, name: s.name })
+      block.days[s.staff_id] = {}
+      block.totals[s.staff_id] = { days: 0, minutes: 0, pay: 0 }
     }
-    const open = row.clock_out == null
+    const open = s.clock_out == null
     if (open) openCount++
-    const minutes = row.minutes_worked ?? 0
-    const day = block.days[s.id][row.work_date]
+    const day = block.days[s.staff_id][s.work_date]
     if (!day) {
-      block.days[s.id][row.work_date] = { clock_in: row.clock_in, clock_out: row.clock_out, minutes, open }
-      block.totals[s.id].days++
+      block.days[s.staff_id][s.work_date] = { clock_in: s.clock_in, clock_out: s.clock_out, minutes: s.minutes, open }
+      block.totals[s.staff_id].days++
     } else {
       // 같은 날 여러 번 근무 → 첫 출근 ~ 마지막 퇴근, 근무 분은 합산
-      day.minutes += minutes
+      day.minutes += s.minutes
       day.open = day.open || open
-      if (row.clock_out && (!day.clock_out || row.clock_out > day.clock_out)) day.clock_out = row.clock_out
+      if (s.clock_out && (!day.clock_out || s.clock_out > day.clock_out)) day.clock_out = s.clock_out
     }
-    block.totals[s.id].minutes += minutes
-
-    const rate = rateFor(rates, row.work_date)
-    if (!rate) {
-      missing.add(row.work_date)
+    block.totals[s.staff_id].minutes += s.minutes
+    if (s.rate === null) {
+      missing.add(s.work_date)
       continue
     }
-    const hourly = block === sunday ? rate.sunday_hourly : rate.weekday_hourly
-    block.totals[s.id].pay += (minutes / 60) * hourly
+    blockRates[s.sunday ? 'sunday' : 'weekday'].add(s.rate)
+    block.totals[s.staff_id].pay += (s.minutes / 60) * s.rate
   }
 
   for (const block of [weekday, sunday]) {
@@ -229,10 +316,32 @@ export async function buildTimesheet(year: number, month: number): Promise<Times
     dates,
     weekday,
     sunday,
-    rates: { weekday: lastRate?.weekday_hourly ?? null, sunday: lastRate?.sunday_hourly ?? null },
+    rates: {
+      weekday: blockRates.weekday.size ? Math.max(...blockRates.weekday) : lastRate?.weekday_hourly ?? null,
+      sunday: blockRates.sunday.size ? Math.max(...blockRates.sunday) : lastRate?.sunday_hourly ?? null,
+    },
+    qrStart,
     missingRateDates: [...missing].sort(),
     openCount,
     payrollItems,
     total: weekday.pay + sunday.pay + itemsTotal,
   }
+}
+
+// 누적 근무일지의 첫 달 — 종이·QR·수기 항목 중 가장 이른 달
+export async function firstTimesheetMonth(): Promise<{ year: number; month: number } | null> {
+  const supabase = createServerClient()
+  const [w, a, p] = await Promise.all([
+    supabase.from('work_logs').select('date').order('date').limit(1).maybeSingle(),
+    supabase.from('attendance_logs').select('work_date').order('work_date').limit(1).maybeSingle(),
+    supabase.from('payroll_items').select('year, month').order('year').order('month').limit(1).maybeSingle(),
+  ])
+  const candidates = [
+    w.data?.date?.slice(0, 7),
+    a.data?.work_date?.slice(0, 7),
+    p.data ? `${p.data.year}-${String(p.data.month).padStart(2, '0')}` : undefined,
+  ].filter((v): v is string => !!v)
+  if (candidates.length === 0) return null
+  const [y, m] = candidates.sort()[0].split('-').map(Number)
+  return { year: y, month: m }
 }
