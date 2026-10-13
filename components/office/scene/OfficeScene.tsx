@@ -278,7 +278,11 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           const ax = ch ? ch.x * TILE + 8 : seat.col * TILE + 8
           const sitOff = sitting ? (ch.target === 'seat' ? DESK_SIT_OFFSET : SIT_OFFSET) : 0
           const ay = ch ? (ch.y + 1) * TILE - FRAME_H + sitOff - 4 : seat.row * TILE - 2
-          el.style.transform = `translate(${Math.round(ax * cssScale)}px, ${Math.round(ay * cssScale)}px) translate(-50%, -100%)`
+          // 가운데·아래 맞춤까지 정수 px로 — 소수 px 위치면 글자가 뿌옇게 보임
+          const tx = Math.round(ax * cssScale - el.offsetWidth / 2)
+          const ty = Math.round(ay * cssScale - el.offsetHeight)
+          const t = `translate(${tx}px, ${ty}px)`
+          if (el.style.transform !== t) el.style.transform = t
         }
 
         raf = requestAnimationFrame(frame)
@@ -339,7 +343,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           }}
           onClick={() => onSelect(a.key)}
           aria-pressed={a.key === selected}
-          className="absolute left-0 top-0 flex flex-col items-center gap-0.5 will-change-transform"
+          className="absolute left-0 top-0 flex flex-col items-center gap-0.5"
           style={{ transform: 'translate(-9999px, 0)' }}
         >
           {a.items > 0 && (
@@ -349,7 +353,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           )}
           <span
             className={`text-[10px] leading-none px-1.5 py-1 rounded-full whitespace-nowrap font-semibold shadow-sm ${
-              a.key === selected ? 'bg-[#1a5c3a] text-white' : 'bg-white/90 text-[#2a2a2a]'
+              a.key === selected ? 'bg-[#1a5c3a] text-white' : 'bg-white text-[#2a2a2a]'
             }`}
           >
             {a.name}
