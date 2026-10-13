@@ -15,6 +15,9 @@ export default function Sidebar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  // 직원용 출퇴근 화면(/clock)은 관리 메뉴 없이 단독 화면
+  if (pathname.startsWith('/clock')) return null
+
   function isActive(group: string[]) {
     return group.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)))
   }

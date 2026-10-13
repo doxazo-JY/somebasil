@@ -43,7 +43,8 @@
 
 **관리**:
 - `/upload` — 업로드 + 거래 재분류(통장 탭) + 마스터 관리(메뉴 탭) + 근무일지 탭
-- `/staff` — 직원 (조회 전용: KPI · 직원×월 근무시간/지급액 · 목록). 데이터는 근무일지 업로드로만 들어옴. `/staff/[id]` 상세는 링크 숨김 (수동 출퇴근 입력 미정비)
+- `/staff` — 직원. 탭: 요약(근무일지 업로드 기준 KPI · 직원×월 근무시간/지급액 · 목록) / 출퇴근 기록 / 근무일지·인건비 / 직원·폰 / QR·시급 (뒤 4개 = QR 출퇴근). `/staff/[id]` 상세는 링크 숨김
+- `/clock` — 직원용 QR 출퇴근 (로그인 없음, 사이드바 없음)
 - `/settings` — 설정 (대표 토글, 수동 조정)
 
 ## 사이드바 (3개 그룹) + PageTabs (그룹 내)
@@ -90,6 +91,20 @@
 - ⚠️ 지출 집계에 사용하지 않음 — "이번 달 이 직원한테 얼마 줘야 하나" 계산 전용
 - ⚠️ 정의 2개 공존: 근무일지 업로드 = Σ(시간×블록 시급), 주휴 제외 (엑셀 "총 지급액" 기준) / 구 `/api/work-logs` 재계산 = 주휴수당 포함. 현재는 업로드만 사용
 - 실제 인건비 지출은 통장 거래내역 업로드 시 monthly_expenses.labor로 기록됨
+
+### 출퇴근 QR (10/13, `supabase/migrations/20261013_attendance*.sql` 적용 완료)
+- 종이 근무일지(work_logs 업로드)와 병행 시험 운영 중. 공식 기록은 아직 업로드. 병행 후 attendance_logs → work_logs 연결 예정 (요약·수익 진단이 QR 기준으로 갱신되도록)
+- `staff_devices` — 직원별 등록 폰 (token_hash = 쿠키 기기 토큰의 해시, revoked_at)
+- `attendance_logs` — 출퇴근 기록. clock_out null = 근무 중. qr_clock_* = QR 원래 시각 보존, edited_at = 점장 수정
+- `pay_rates` — 매장 공통 시급 이력 (평일 / 주일). effective_from <= 날짜 중 최신
+- `payroll_items` — 월 인건비 요약 수기 항목 (fixed_salary | weekly_holiday_pay | other)
+- `staff.link_token_hash / link_token_expires_at` — 폰 교체 시 점장이 만드는 연결 QR (10분, 1회용)
+- `system_settings.attendance_qr_secret` — 카운터 고정 QR 비밀값
+- 첫 스캔 = 새 직원 등록만 (이름 입력, 기존 이름이면 차단). 기존 직원 연결은 점장 연결 QR로만. PIN 없음
+- 출퇴근은 버튼 방식. 카운터 QR(`/clock?k=`)을 찍으면 3분 입장권 쿠키(`sb_ticket`, HMAC 서명 키 = QR 비밀값) 발급 + 주소에서 k 제거 → 버튼 1회 사용 후 소멸. 링크·열어 둔 탭은 현황만
+- 직원용 주소 분리: `NEXT_PUBLIC_CLOCK_ORIGIN`(Vercel 환경변수)으로 들어온 요청은 `proxy.ts`가 `/clock`·`/api/clock/*`만 허용, 나머지 404. 카운터 QR·연결 QR은 이 주소로 생성. 미설정 시 제한 없음
+- 근무 중 = 16시간 이내 시작된 퇴근 전 기록. 그보다 오래되면 퇴근 누락 (v2: 근무 중 기록 직원·날짜당 1건)
+- QR용으로 work_logs를 쓰지 않은 이유: 퇴근 전 상태 저장 불가, 자정 넘김 계산 오류
 
 ### daily_sales — POS 상품 라인 단위 매출
 - id, date, order_id, line_no, product_name, category, quantity, amount, order_time, source, created_at
