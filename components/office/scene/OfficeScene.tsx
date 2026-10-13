@@ -7,7 +7,7 @@ import { COLS, DESK_SIT_OFFSET, FLOOR, FURNITURE, LOUNGE_COLS, REST_SPOTS, ROWS,
 // AI 사무실 장면 — Pixel Agents 그림(public/office) 위에서 AI들이 실제 상태대로 움직임
 //   mode 'type' : 자기 책상에서 타이핑 (실행 중)
 //   mode 'read' : 자기 책상에서 읽기 (점장이 확인할 일이 있음)
-//   mode 'rest' : 라운지에서 쉼 (가끔 다른 쉬는 자리로 이동)
+//   mode 'rest' : 왼쪽 쉬는 곳에서 쉼 (가끔 다른 쉬는 자리로 이동)
 //   vacant      : 입사 전 — 캐릭터 없음
 // 이름표·상태·말풍선은 HTML로 캐릭터 머리 위를 따라다님 (글자 선명하게)
 
@@ -119,6 +119,19 @@ export default function OfficeScene({ agents, selected, onSelect }: {
       const bg = base.getContext('2d')!
       for (let r = WALL_ROW + 1; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) bg.drawImage(c < LOUNGE_COLS ? floorLounge : floorOffice, c * TILE, r * TILE)
+      }
+      // 자리별 러그 — 무늬 없는 바닥에 자리 색을 입히고 테두리 한 줄
+      for (const { rug } of Object.values(SEATS)) {
+        bg.fillStyle = rug.edge
+        bg.fillRect(rug.x, rug.y, rug.w, rug.h)
+        bg.fillStyle = rug.fill
+        bg.fillRect(rug.x + 1, rug.y + 1, rug.w - 2, rug.h - 2)
+        // 안쪽 테두리 한 줄 (러그 무늬)
+        bg.fillStyle = rug.edge
+        bg.fillRect(rug.x + 3, rug.y + 3, rug.w - 6, 1)
+        bg.fillRect(rug.x + 3, rug.y + rug.h - 4, rug.w - 6, 1)
+        bg.fillRect(rug.x + 3, rug.y + 3, 1, rug.h - 6)
+        bg.fillRect(rug.x + rug.w - 4, rug.y + 3, 1, rug.h - 6)
       }
       // 뒷벽: 1행 한 줄. 양 끝은 끝 조각, 가운데는 가로로 이어지는 조각 (비트마스크 E=2, W=8)
       for (let c = 0; c < COLS; c++) {
@@ -260,6 +273,22 @@ export default function OfficeScene({ agents, selected, onSelect }: {
                 ctx.drawImage(ch.sheet, frameIdx * FRAME_W, DIR_ROW[ch.dir] * FRAME_H, FRAME_W, FRAME_H, px, py, FRAME_W, FRAME_H)
               }
               ctx.restore()
+              // 작업 중: 머리 옆에 '…' 말풍선 (점이 차례로 진해짐) — 확인 기다리는 AI와 구분
+              if (ch.pose === 'sit-type') {
+                const bx = px + 12
+                const by = py + 1
+                ctx.fillStyle = '#2a2a2a'
+                ctx.fillRect(bx, by, 15, 9)
+                ctx.fillRect(bx + 2, by + 9, 2, 2)
+                ctx.fillStyle = '#ffffff'
+                ctx.fillRect(bx + 1, by + 1, 13, 7)
+                ctx.fillRect(bx + 3, by + 8, 1, 2)
+                const on = Math.floor(ch.t / 0.3) % 3
+                for (let i = 0; i < 3; i++) {
+                  ctx.fillStyle = i === on ? '#1a5c3a' : '#b8b8b8'
+                  ctx.fillRect(bx + 3 + i * 4, by + 4, 2, 2)
+                }
+              }
             },
           })
         }
@@ -267,6 +296,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
 
         // ── 이름표 위치 (캔버스 CSS 크기 기준)
         const cssScale = canvas.clientWidth / (COLS * TILE)
+        const wanted: { el: HTMLButtonElement; x: number; y: number; w: number; h: number }[] = []
         for (const a of agentsRef.current) {
           const el = labelRefs.current[a.key]
           if (!el) continue
@@ -277,10 +307,26 @@ export default function OfficeScene({ agents, selected, onSelect }: {
           const sitOff = sitting ? (ch.target === 'seat' ? DESK_SIT_OFFSET : SIT_OFFSET) : 0
           const ay = ch ? (ch.y + 1) * TILE - FRAME_H + sitOff - 4 : seat.row * TILE - 2
           // 가운데·아래 맞춤까지 정수 px로 — 소수 px 위치면 글자가 뿌옇게 보임
-          const tx = Math.round(ax * cssScale - el.offsetWidth / 2)
-          const ty = Math.round(ay * cssScale - el.offsetHeight)
-          const t = `translate(${tx}px, ${ty}px)`
-          if (el.style.transform !== t) el.style.transform = t
+          const w = el.offsetWidth
+          const h = el.offsetHeight
+          // 사무실 밖으로 잘리지 않게 좌우 안쪽으로
+          const maxX = canvas.clientWidth - w - 2
+          wanted.push({ el, x: Math.max(2, Math.min(maxX, Math.round(ax * cssScale - w / 2))), y: Math.round(ay * cssScale - h), w, h })
+        }
+        // 이름표끼리 겹치면 위에 있는 쪽을 더 위로 쌓기 (아래 이름표부터 자리 확정)
+        const placed: typeof wanted = []
+        const hit = (l: (typeof wanted)[number]) => placed.find((o) => l.x < o.x + o.w && o.x < l.x + l.w && l.y < o.y + o.h && o.y < l.y + l.h)
+        for (const l of wanted.sort((p, q) => q.y - p.y)) {
+          const y0 = l.y
+          // 위로 쌓아 보고, 사무실 위로 넘치면 아래로
+          for (let o = hit(l); o; o = hit(l)) l.y = o.y - l.h - 2
+          if (l.y < 0) {
+            l.y = y0
+            for (let o = hit(l); o; o = hit(l)) l.y = o.y + o.h + 2
+          }
+          placed.push(l)
+          const t = `translate(${l.x}px, ${l.y}px)`
+          if (l.el.style.transform !== t) l.el.style.transform = t
         }
 
         raf = requestAnimationFrame(frame)
@@ -331,7 +377,7 @@ export default function OfficeScene({ agents, selected, onSelect }: {
         ref={canvasRef}
         className="absolute inset-0 w-full h-full cursor-pointer [image-rendering:pixelated]"
         role="img"
-        aria-label="AI 사무실. 일하는 AI는 자기 책상에서 타이핑하고, 쉬는 AI는 왼쪽 카페 라운지에 있어요."
+        aria-label="AI 사무실. 작업 중인 AI는 자기 책상에서 타이핑하고, 확인을 기다리는 AI는 자리에서 서류를 보고, 할 일이 없는 AI는 왼쪽 쉬는 곳에 있어요."
       />
       {agents.map((a) => (
         <button
@@ -354,8 +400,10 @@ export default function OfficeScene({ agents, selected, onSelect }: {
               a.key === selected ? 'bg-[#1a5c3a] text-white' : 'bg-white text-[#2a2a2a]'
             }`}
           >
+            {/* 자리 러그 색 — 어느 책상 주인인지 */}
+            <span className="inline-block w-2 h-2 rounded-full mr-1 align-[-1px] ring-1 ring-white/70" style={{ background: SEATS[a.key]?.rug.dot }} />
             {a.name}
-            <span className={`ml-1 font-medium ${a.key === selected ? 'text-white/80' : a.chip.cls}`}>· {a.chip.label}</span>
+            <span className={`hidden sm:inline ml-1 font-medium ${a.key === selected ? 'text-white/80' : a.chip.cls}`}>· {a.chip.label}</span>
           </span>
         </button>
       ))}

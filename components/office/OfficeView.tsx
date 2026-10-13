@@ -23,13 +23,15 @@ const fmtDateTime = (iso: string) =>
   new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso))
 
 // 상태 표시 (이름표 옆 글자 색)
-function chipOf(agent: OfficeAgent, last: AiRun | undefined, today: string, running: boolean): { label: string; cls: string } {
+// 작업 중(타이핑) / 확인 기다림(자리에서 서류) / 쉬는 중(쉬는 곳) — 그림의 모습과 같은 말로
+function chipOf(agent: OfficeAgent, last: AiRun | undefined, today: string, running: boolean, items: number): { label: string; cls: string } {
   if (agent.vacant) return { label: '입사 예정', cls: 'text-[#8a8370]' }
   if (agent.chat) return { label: running ? '답하는 중' : '질문 받는 중', cls: 'text-[#1a5c3a]' }
-  if (running || last?.status === 'running') return { label: '작업 중', cls: 'text-[#1a5c3a]' }
+  if (running) return { label: '작업 중', cls: 'text-[#1a5c3a]' }
   if (last?.status === 'failed') return { label: '실패', cls: 'text-red-600' }
-  if (last && kstDay(last.started_at) === today) return { label: '오늘 점검', cls: 'text-[#1a5c3a]' }
-  return { label: '대기', cls: 'text-[#6d6656]' }
+  if (items > 0) return { label: '확인 기다림', cls: 'text-[#9a5b00]' }
+  if (last && kstDay(last.started_at) === today) return { label: '오늘 일 끝', cls: 'text-[#6d6656]' }
+  return { label: '쉬는 중', cls: 'text-[#6d6656]' }
 }
 
 // AI 사무실 — 캐릭터(또는 책상)를 누르면 그 AI의 업무함만
@@ -60,9 +62,9 @@ export default function OfficeView({ open, closed, runs, today, configProblem, a
       key: a.key,
       name: a.name,
       vacant: !!a.vacant,
-      // 실행 중 → 책상에서 타이핑 / 확인할 일 있음·비서 → 책상에서 읽기 / 그 외 → 라운지
+      // 실행 중 → 책상에서 타이핑 / 확인할 일 있음·비서 → 책상에서 읽기 / 그 외 → 쉬는 곳
       mode: running ? 'type' : items.length > 0 || a.chat ? 'read' : 'rest',
-      chip: chipOf(a, lastRun(a.key), today, running),
+      chip: chipOf(a, lastRun(a.key), today, running, items.length),
       items: items.length,
       warn: items.some((i) => i.severity === 'warn'),
     }
