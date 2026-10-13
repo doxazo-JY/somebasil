@@ -7,7 +7,7 @@ import type { PayRate } from '@/lib/supabase/queries/attendance-admin'
 
 const INPUT = 'text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]'
 
-// 카운터 QR + 매장 공통 시급
+// 카운터 QR + 매장 공통 시급 (직원·설정 탭 아래쪽)
 export default function AttendanceSettings({ qrSecret, rates }: { qrSecret: string | null; rates: PayRate[] }) {
   return (
     <div className="grid md:grid-cols-2 gap-4 items-start">

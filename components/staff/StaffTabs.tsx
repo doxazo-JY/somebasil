@@ -2,20 +2,16 @@
 
 import { useState } from 'react'
 
-// /staff 페이지 내부 탭 — 한 화면에 한 가지씩
-// 요약 = 근무일지 업로드 기준, 나머지 = QR 출퇴근
+// /staff 페이지 내부 탭 — 근무(매일·월말) / 직원·설정(가끔)
 const TABS = [
-  { key: 'summary', label: '요약' },
-  { key: 'logs', label: '출퇴근 기록' },
-  { key: 'timesheet', label: '근무일지·인건비' },
-  { key: 'staff', label: '직원·폰' },
-  { key: 'settings', label: 'QR·시급' },
+  { key: 'work', label: '근무' },
+  { key: 'settings', label: '직원·설정' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
 
 export default function StaffTabs({ sections }: { sections: Record<TabKey, React.ReactNode> }) {
-  const [tab, setTab] = useState<TabKey>('summary')
+  const [tab, setTab] = useState<TabKey>('work')
   return (
     <div>
       <div className="flex gap-1 mb-4 border-b border-gray-100 overflow-x-auto" role="tablist">

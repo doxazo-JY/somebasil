@@ -40,7 +40,7 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100">
       <div className="px-5 py-4 border-b border-gray-100">
-        <p className="text-sm font-semibold text-gray-800">직원과 등록된 폰</p>
+        <p className="text-sm font-semibold text-gray-800">직원</p>
         <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
           새 직원은 카운터 QR을 처음 찍을 때 자동으로 추가돼요. 폰을 바꾼 직원은 [연결 QR]을 눌러 새 폰으로 찍게 해 주세요.
         </p>
@@ -53,7 +53,10 @@ export default function StaffDeviceList({ staff }: { staff: StaffRow[] }) {
             <li key={s.id} className={`px-5 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 ${s.is_active ? '' : 'opacity-50'}`}>
               <div className="min-w-[120px]">
                 <p className="text-sm text-gray-900 font-medium">{s.name}</p>
-                <p className="text-[11px] text-gray-400">{s.is_active ? `${s.hire_date} 등록` : '퇴사'}</p>
+                <p className="text-[11px] text-gray-400 tabular-nums">
+                  {s.is_active ? `${s.hire_date} 입사` : '퇴사'}
+                  {s.hourly_pay > 0 && ` · 시급 ${s.hourly_pay.toLocaleString('ko-KR')}`}
+                </p>
               </div>
               <select
                 id={`role-${s.id}`}

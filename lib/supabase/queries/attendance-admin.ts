@@ -23,6 +23,7 @@ export type StaffRow = {
   role: 'manager' | 'assistant' | 'part_time'
   is_active: boolean
   hire_date: string
+  hourly_pay: number // 근무일지 업로드가 갱신하는 직원별 평일 시급
   devices: { id: number; label: string | null; created_at: string; last_used_at: string | null }[]
 }
 
@@ -81,7 +82,7 @@ export async function getOpenLogs(): Promise<AdminLog[]> {
 export async function getStaffWithDevices(): Promise<StaffRow[]> {
   const supabase = createServerClient()
   const [{ data: staff, error }, { data: devices }] = await Promise.all([
-    supabase.from('staff').select('id, name, role, is_active, hire_date').order('is_active', { ascending: false }).order('hire_date'),
+    supabase.from('staff').select('id, name, role, is_active, hire_date, hourly_pay').order('is_active', { ascending: false }).order('hire_date'),
     supabase.from('staff_devices').select('id, staff_id, label, created_at, last_used_at').is('revoked_at', null).order('created_at'),
   ])
   if (error) throw error

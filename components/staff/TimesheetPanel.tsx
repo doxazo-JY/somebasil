@@ -2,89 +2,112 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Timesheet, TimesheetBlock, PayrollItem } from '@/lib/supabase/queries/attendance-admin'
+import type { Timesheet, PayrollItem } from '@/lib/supabase/queries/attendance-admin'
 import { fmtWorkDate } from '@/lib/attendance/format'
+
+// 근무 탭의 월 정리 부분 — QR 출퇴근 기준
+//   MonthOverview: 경고 + 숫자 카드 + 근무일지 엑셀
+//   default(TimesheetPanel): 직원별 합계 + 수기 항목
 
 const KIND_LABEL: Record<PayrollItem['kind'], string> = { fixed_salary: '고정급', weekly_holiday_pay: '주휴수당', other: '기타' }
 const won = (n: number) => n.toLocaleString('ko-KR')
+const hours = (min: number) => `${Math.round((min / 60) * 10) / 10}시간`
 const INPUT = 'text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]'
 
-// 월 근무일지 요약 + 인건비 수기 항목 + 엑셀 다운로드
-export default function TimesheetPanel({ ts, staffOptions }: { ts: Timesheet; staffOptions: { id: number; name: string }[] }) {
-  const warnings: string[] = []
-  if (ts.openCount > 0) warnings.push(`퇴근 기록이 없는 근무 ${ts.openCount}건이 근무시간에서 빠져 있어요. 출퇴근 기록 탭에서 퇴근 시간을 넣어 주세요.`)
-  if (ts.missingRateDates.length > 0) warnings.push(`시급이 등록되지 않은 날짜가 있어 지급액에서 빠졌어요: ${ts.missingRateDates.map(fmtWorkDate).join(', ')}. QR·시급 탭에서 시급을 추가해 주세요.`)
+// 평일·주일 블록을 직원 한 줄로 합침
+function staffRows(ts: Timesheet) {
+  const rows = new Map<number, { name: string; days: number; weekdayMin: number; sundayMin: number; pay: number }>()
+  for (const [block, key] of [[ts.weekday, 'weekdayMin'], [ts.sunday, 'sundayMin']] as const) {
+    for (const s of block.staff) {
+      const t = block.totals[s.id]
+      const row = rows.get(s.id) ?? { name: s.name, days: 0, weekdayMin: 0, sundayMin: 0, pay: 0 }
+      row.days += t.days
+      row[key] += t.minutes
+      row.pay += t.pay
+      rows.set(s.id, row)
+    }
+  }
+  return [...rows.values()]
+}
+
+export function MonthOverview({ ts }: { ts: Timesheet }) {
+  const rows = staffRows(ts)
+  const totalMin = rows.reduce((s, r) => s + r.weekdayMin + r.sundayMin, 0)
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-100 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-gray-800">{ts.month}월분 총 인건비(세전)</p>
-          <p className="text-2xl font-bold text-gray-900 tabular-nums mt-1">{won(ts.total)}원</p>
-          <p className="text-xs text-gray-400 mt-0.5">평일 {won(ts.weekday.pay)} · 주일 {won(ts.sunday.pay)} · 수기 항목 {won(ts.payrollItems.reduce((s, i) => s + i.amount, 0))}</p>
-        </div>
-        <a
-          href={`/api/attendance/export?year=${ts.year}&month=${ts.month}`}
-          className="text-xs px-4 py-2 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30]"
-        >
-          근무일지 엑셀 내려받기
-        </a>
-      </div>
-
-      {warnings.length > 0 && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-5 py-3 space-y-1">
-          {warnings.map((w) => <p key={w} className="text-xs text-amber-800 [word-break:keep-all]">{w}</p>)}
+    <div className="space-y-3">
+      {ts.missingRateDates.length > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl px-5 py-3">
+          <p className="text-xs text-amber-800 [word-break:keep-all]">
+            시급이 등록되지 않은 날짜가 있어 지급액에서 빠졌어요: {ts.missingRateDates.map(fmtWorkDate).join(', ')}. 직원·설정 탭에서 시급을 추가해 주세요.
+          </p>
         </div>
       )}
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <BlockSummary title="평일 근무" hourly={ts.rates.weekday} block={ts.weekday} />
-        <BlockSummary title="주일 근무" hourly={ts.rates.sunday} block={ts.sunday} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card label={`${ts.month}월 근무시간`} value={hours(totalMin)} />
+        <Card label={`${ts.month}월 인건비(세전)`} value={`${won(ts.total)}원`} sub="수기 항목 포함" />
+        <Card label="근무 인원" value={`${rows.length}명`} sub="QR 기록 기준" />
+        <a
+          href={`/api/attendance/export?year=${ts.year}&month=${ts.month}`}
+          className="rounded-xl bg-[#1a5c3a] text-white hover:bg-[#154d30] px-5 py-4 flex flex-col justify-center"
+        >
+          <span className="text-sm font-semibold">근무일지 엑셀</span>
+          <span className="text-xs text-white/70 mt-0.5">세무사 전달용 내려받기</span>
+        </a>
       </div>
-
-      <PayrollItems year={ts.year} month={ts.month} items={ts.payrollItems} staffOptions={staffOptions} />
     </div>
   )
 }
 
-function BlockSummary({ title, hourly, block }: { title: string; hourly: number | null; block: TimesheetBlock }) {
+function Card({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100">
-      <div className="px-5 py-3 border-b border-gray-100 flex justify-between items-baseline">
-        <p className="text-sm font-semibold text-gray-800">{title}</p>
-        <p className="text-xs text-gray-400">시급 {hourly ? won(hourly) : '미등록'}</p>
-      </div>
-      {block.staff.length === 0 ? (
-        <p className="text-xs text-gray-400 text-center py-8">기록 없음</p>
-      ) : (
-        <table className="w-full text-xs">
-          <thead className="text-gray-400">
-            <tr>
-              <th className="text-left px-5 py-2 font-medium">직원</th>
-              <th className="text-right px-3 py-2 font-medium">근무일수</th>
-              <th className="text-right px-3 py-2 font-medium">근무시간</th>
-              <th className="text-right px-5 py-2 font-medium">지급액</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {block.staff.map((s) => {
-              const t = block.totals[s.id]
-              return (
-                <tr key={s.id}>
-                  <td className="px-5 py-2 text-gray-900">{s.name}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{t.days}일</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{(t.minutes / 60).toFixed(1)}시간</td>
-                  <td className="px-5 py-2 text-right tabular-nums">{won(t.pay)}</td>
+    <div className="bg-white rounded-xl border border-gray-100 px-5 py-4">
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-xl font-bold text-gray-900 tabular-nums mt-1">{value}</p>
+      {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+export default function TimesheetPanel({ ts, staffOptions }: { ts: Timesheet; staffOptions: { id: number; name: string }[] }) {
+  const rows = staffRows(ts)
+  return (
+    <div className="grid lg:grid-cols-2 gap-4 items-start">
+      <div className="bg-white rounded-xl border border-gray-100">
+        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-baseline gap-3">
+          <p className="text-sm font-semibold text-gray-800">직원별 합계</p>
+          <p className="text-xs text-gray-400">
+            시급 평일 {ts.rates.weekday ? won(ts.rates.weekday) : '미등록'} · 주일 {ts.rates.sunday ? won(ts.rates.sunday) : '미등록'}
+          </p>
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-8">이 달의 QR 출퇴근 기록이 없어요</p>
+        ) : (
+          <table className="w-full text-xs">
+            <thead className="text-gray-400">
+              <tr>
+                <th className="text-left px-5 py-2 font-medium">직원</th>
+                <th className="text-right px-3 py-2 font-medium">근무일수</th>
+                <th className="text-right px-3 py-2 font-medium">평일</th>
+                <th className="text-right px-3 py-2 font-medium">주일</th>
+                <th className="text-right px-5 py-2 font-medium">지급액</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {rows.map((r) => (
+                <tr key={r.name}>
+                  <td className="px-5 py-2 text-gray-900">{r.name}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{r.days}일</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{hours(r.weekdayMin)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{r.sundayMin ? hours(r.sundayMin) : '—'}</td>
+                  <td className="px-5 py-2 text-right tabular-nums">{won(r.pay)}</td>
                 </tr>
-              )
-            })}
-            <tr className="bg-gray-50/60 font-semibold">
-              <td className="px-5 py-2" colSpan={3}>합계</td>
-              <td className="px-5 py-2 text-right tabular-nums">{won(block.pay)}</td>
-            </tr>
-          </tbody>
-        </table>
-      )}
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <PayrollItems year={ts.year} month={ts.month} items={ts.payrollItems} staffOptions={staffOptions} />
     </div>
   )
 }
@@ -123,7 +146,7 @@ function PayrollItems({ year, month, items, staffOptions }: { year: number; mont
     <div className="bg-white rounded-xl border border-gray-100">
       <div className="px-5 py-4 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-800">수기 항목</p>
-        <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">점장·매니저 고정급, 주휴수당처럼 출퇴근으로 계산되지 않는 금액. 근무일지 요약에 그대로 들어가요</p>
+        <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">점장·매니저 고정급, 주휴수당처럼 출퇴근으로 계산되지 않는 금액. 인건비와 근무일지 엑셀에 포함돼요</p>
       </div>
       {items.length > 0 && (
         <ul className="divide-y divide-gray-50">
@@ -137,7 +160,7 @@ function PayrollItems({ year, month, items, staffOptions }: { year: number; mont
           ))}
         </ul>
       )}
-      <form onSubmit={add} className="px-5 py-3 border-t border-gray-50 grid grid-cols-2 md:grid-cols-5 gap-2">
+      <form onSubmit={add} className="px-5 py-3 border-t border-gray-50 grid grid-cols-2 gap-2">
         <select id="payroll-kind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as PayrollItem['kind'] })} className={INPUT}>
           {Object.entries(KIND_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
@@ -147,7 +170,7 @@ function PayrollItems({ year, month, items, staffOptions }: { year: number; mont
         </select>
         <input id="payroll-label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="이름 (예: 점장, ○○ 주휴)" required className={INPUT} />
         <input id="payroll-amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="금액" inputMode="numeric" required className={INPUT} />
-        <button type="submit" disabled={saving} className="text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-50">+ 추가</button>
+        <button type="submit" disabled={saving} className="col-span-2 text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-50">+ 추가</button>
       </form>
     </div>
   )
