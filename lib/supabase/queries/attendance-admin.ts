@@ -1,4 +1,5 @@
 import { createServerClient } from '../server'
+import { fetchAllRows } from '../fetchAll'
 import { isSunday, kstIso } from '@/lib/attendance/format'
 
 // 점장 관리 화면(/staff)용 출퇴근 쿼리
@@ -124,19 +125,21 @@ export function rateFor(rates: PayRate[], workDate: string): PayRate | null {
 }
 
 
-// QR 기록 시작일 — 이 날짜 전은 종이 근무일지(work_logs 업로드), 이 날짜부터는 QR(attendance_logs)
-// 미설정이면 전부 종이 근무일지 (병행 기간)
-export async function getQrStartDate(): Promise<string | null> {
+// 기준 기록 — 같은 직원·같은 날 종이 근무일지(work_logs)와 QR(attendance_logs)이 둘 다 있으면 어느 쪽을 쓸지
+//   paper(기본, QR과 병행하는 동안) / qr(QR로 넘어갈 때). 한쪽에만 있는 날은 있는 쪽을 씀
+export type SourcePriority = 'paper' | 'qr'
+
+export async function getSourcePriority(): Promise<SourcePriority> {
   const supabase = createServerClient()
-  const { data } = await supabase.from('system_settings').select('value').eq('key', 'attendance_qr_start_date').maybeSingle()
-  return typeof data?.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.value) ? data.value : null
+  const { data } = await supabase.from('system_settings').select('value').eq('key', 'attendance_source_priority').maybeSingle()
+  return data?.value === 'qr' ? 'qr' : 'paper'
 }
 
 // ─────────────────────────────────────────────
 // 근무일지 — 지금 쓰는 P.T. 근무일지 엑셀과 같은 구조
 //   평일 근무 / 주일 근무 블록, 직원별 출근·퇴근·근무시간, 근무일수·근무시간·지급액
 //   대상: 알바생(part_time)
-//   날짜별 출처: QR 시작일 전 = 종이 근무일지(work_logs), 시작일부터 = QR(attendance_logs)
+//   날짜별 출처: 기준 기록 우선, 그날 그 기록이 없으면 다른 쪽 (mergeShifts)
 // ─────────────────────────────────────────────
 
 export type TimesheetDay = {
@@ -160,7 +163,8 @@ export type Timesheet = {
   weekday: TimesheetBlock
   sunday: TimesheetBlock
   rates: { weekday: number | null; sunday: number | null } // 표시용 (그달 기록의 시급, 없으면 시급 이력)
-  qrStart: string | null     // QR 기록 시작일
+  priority: SourcePriority   // 기준 기록
+  shifts: Shift[]            // 그달 계산에 쓴 근무 (출처 표시용)
   missingRateDates: string[] // 시급을 알 수 없는 근무 날짜
   openCount: number          // 퇴근 누락 건수 (QR)
   payrollItems: PayrollItem[]
@@ -177,34 +181,42 @@ export type Shift = {
   minutes: number
   rate: number | null
   sunday: boolean
+  source: 'paper' | 'qr'
+  log_id: number | null // QR 기록 id (고치기용), 종이는 null
 }
 
 type StaffJoin = { id: number; name: string; role: string } | null
+type PaperRow = { staff_id: number; date: string; start_time: string; end_time: string; hours_worked: number | null; hourly_rate: number | null; staff: StaffJoin }
+type QrRow = { id: number; staff_id: number; work_date: string; clock_in: string; clock_out: string | null; minutes_worked: number | null; staff: StaffJoin }
 
-async function paperShifts(start: string, end: string, qrStart: string | null): Promise<Shift[]> {
+async function paperShifts(start: string, end: string): Promise<Shift[]> {
   const supabase = createServerClient()
-  const until = qrStart && qrStart < end ? qrStart : end
-  if (until <= start) return []
-  const { data, error } = await supabase
-    .from('work_logs')
-    .select('staff_id, date, start_time, end_time, hours_worked, hourly_rate, staff:staff_id (id, name, role)')
-    .gte('date', start)
-    .lt('date', until)
-    .order('date')
-    .order('start_time')
-  if (error) throw error
-  const rows = (data ?? []).filter((r) => (r as unknown as { staff: StaffJoin }).staff?.role === 'part_time')
+  const data = await fetchAllRows<PaperRow>(async (from, to) => {
+    const res = await supabase
+      .from('work_logs')
+      .select('staff_id, date, start_time, end_time, hours_worked, hourly_rate, staff:staff_id (id, name, role)')
+      .gte('date', start)
+      .lt('date', end)
+      .order('date')
+      .order('start_time')
+      .range(from, to)
+    return { data: res.data as unknown as PaperRow[] | null, error: res.error }
+  })
+  const rows = data.filter((r) => r.staff?.role === 'part_time')
   // 종이 근무일지는 공휴일도 주일 블록(1.5배) → 그달 최저 시급보다 확실히 높으면 주일로 봄
-  const rates = rows.map((r) => Number(r.hourly_rate)).filter((n) => n > 0)
-  const minRate = rates.length ? Math.min(...rates) : 0
+  const minRate = new Map<string, number>()
+  for (const r of rows) {
+    const ym = r.date.slice(0, 7)
+    const rate = Number(r.hourly_rate)
+    if (rate > 0) minRate.set(ym, Math.min(minRate.get(ym) ?? Infinity, rate))
+  }
   return rows.map((r) => {
-    const staff = (r as unknown as { staff: StaffJoin }).staff!
-    const inHm = String(r.start_time).slice(0, 5)
-    const outHm = String(r.end_time).slice(0, 5)
-    const clockIn = kstIso(r.date, inHm)
-    let clockOut = kstIso(r.date, outHm)
+    const staff = r.staff!
+    const clockIn = kstIso(r.date, String(r.start_time).slice(0, 5))
+    let clockOut = kstIso(r.date, String(r.end_time).slice(0, 5))
     if (clockOut <= clockIn) clockOut = new Date(new Date(clockOut).getTime() + 86400000).toISOString()
     const rate = Number(r.hourly_rate) > 0 ? Number(r.hourly_rate) : null
+    const min = minRate.get(r.date.slice(0, 7)) ?? 0
     return {
       staff_id: staff.id,
       name: staff.name,
@@ -213,26 +225,29 @@ async function paperShifts(start: string, end: string, qrStart: string | null): 
       clock_out: clockOut,
       minutes: Math.round(Number(r.hours_worked ?? 0) * 60),
       rate,
-      sunday: isSunday(r.date) || (rate !== null && minRate > 0 && rate > minRate * 1.2),
+      sunday: isSunday(r.date) || (rate !== null && min > 0 && rate > min * 1.2),
+      source: 'paper' as const,
+      log_id: null,
     }
   })
 }
 
-async function qrShifts(start: string, end: string, qrStart: string | null, rates: PayRate[]): Promise<Shift[]> {
-  if (!qrStart || qrStart >= end) return []
+async function qrShifts(start: string, end: string, rates: PayRate[]): Promise<Shift[]> {
   const supabase = createServerClient()
-  const from = qrStart > start ? qrStart : start
-  const { data, error } = await supabase
-    .from('attendance_logs')
-    .select('staff_id, work_date, clock_in, clock_out, minutes_worked, staff:staff_id (id, name, role)')
-    .gte('work_date', from)
-    .lt('work_date', end)
-    .order('clock_in')
-  if (error) throw error
-  return (data ?? [])
-    .filter((r) => (r as unknown as { staff: StaffJoin }).staff?.role === 'part_time')
+  const data = await fetchAllRows<QrRow>(async (from, to) => {
+    const res = await supabase
+      .from('attendance_logs')
+      .select('id, staff_id, work_date, clock_in, clock_out, minutes_worked, staff:staff_id (id, name, role)')
+      .gte('work_date', start)
+      .lt('work_date', end)
+      .order('clock_in')
+      .range(from, to)
+    return { data: res.data as unknown as QrRow[] | null, error: res.error }
+  })
+  return data
+    .filter((r) => r.staff?.role === 'part_time')
     .map((r) => {
-      const staff = (r as unknown as { staff: StaffJoin }).staff!
+      const staff = r.staff!
       const sunday = isSunday(r.work_date)
       const rate = rateFor(rates, r.work_date)
       return {
@@ -244,23 +259,28 @@ async function qrShifts(start: string, end: string, qrStart: string | null, rate
         minutes: r.minutes_worked ?? 0,
         rate: rate ? (sunday ? rate.sunday_hourly : rate.weekday_hourly) : null,
         sunday,
+        source: 'qr' as const,
+        log_id: r.id,
       }
     })
+}
+
+// 직원·날짜별로 기준 기록을 쓰고, 그날 그 기록이 없으면 다른 쪽
+export function mergeShifts(paper: Shift[], qr: Shift[], priority: SourcePriority): Shift[] {
+  const [first, second] = priority === 'qr' ? [qr, paper] : [paper, qr]
+  const covered = new Set(first.map((s) => `${s.staff_id}|${s.work_date}`))
+  return [...first, ...second.filter((s) => !covered.has(`${s.staff_id}|${s.work_date}`))]
 }
 
 export async function buildTimesheet(
   year: number,
   month: number,
-  pre?: { rates: PayRate[]; qrStart: string | null }
+  pre?: { rates: PayRate[]; priority: SourcePriority }
 ): Promise<Timesheet> {
   const { start, end } = monthRange(year, month)
-  const rates = pre?.rates ?? (await getPayRates())
-  const qrStart = pre ? pre.qrStart : await getQrStartDate()
-  const [paper, qr, payrollItems] = await Promise.all([
-    paperShifts(start, end, qrStart),
-    qrShifts(start, end, qrStart, rates),
-    getPayrollItems(year, month),
-  ])
+  const [rates, priority] = pre ? [pre.rates, pre.priority] : await Promise.all([getPayRates(), getSourcePriority()])
+  const [paper, qr, payrollItems] = await Promise.all([paperShifts(start, end), qrShifts(start, end, rates), getPayrollItems(year, month)])
+  const shifts = mergeShifts(paper, qr, priority)
 
   const dates: string[] = []
   for (let d = new Date(`${start}T00:00:00Z`); d.toISOString().slice(0, 10) < end; d = new Date(d.getTime() + 86400000)) {
@@ -274,7 +294,7 @@ export async function buildTimesheet(
   const missing = new Set<string>()
   let openCount = 0
 
-  for (const s of [...paper, ...qr].sort((a, b) => a.clock_in.localeCompare(b.clock_in))) {
+  for (const s of [...shifts].sort((a, b) => a.clock_in.localeCompare(b.clock_in))) {
     const block = s.sunday ? sunday : weekday
     if (!block.days[s.staff_id]) {
       block.staff.push({ id: s.staff_id, name: s.name })
@@ -320,7 +340,8 @@ export async function buildTimesheet(
       weekday: blockRates.weekday.size ? Math.max(...blockRates.weekday) : lastRate?.weekday_hourly ?? null,
       sunday: blockRates.sunday.size ? Math.max(...blockRates.sunday) : lastRate?.sunday_hourly ?? null,
     },
-    qrStart,
+    priority,
+    shifts,
     missingRateDates: [...missing].sort(),
     openCount,
     payrollItems,
@@ -346,9 +367,32 @@ export async function firstTimesheetMonth(): Promise<{ year: number; month: numb
   return { year: y, month: m }
 }
 
-// 기간 안의 알바생 근무 (QR 기록 시작일 기준으로 종이/QR 합침) — 비서 AI 근무시간 조회용
+// 기간 안의 알바생 근무 (기준 기록으로 종이/QR 합침) — 비서 AI 근무시간 조회 · 전체 근무일지
 export async function getShiftsBetween(start: string, endExclusive: string): Promise<Shift[]> {
-  const [rates, qrStart] = await Promise.all([getPayRates(), getQrStartDate()])
-  const [paper, qr] = await Promise.all([paperShifts(start, endExclusive, qrStart), qrShifts(start, endExclusive, qrStart, rates)])
-  return [...paper, ...qr]
+  const [rates, priority] = await Promise.all([getPayRates(), getSourcePriority()])
+  const [paper, qr] = await Promise.all([paperShifts(start, endExclusive), qrShifts(start, endExclusive, rates)])
+  return mergeShifts(paper, qr, priority)
+}
+
+// 전체 근무일지 — 직원 × 월 근무시간·지급액 (기준 기록으로 합침, 수기 항목 제외)
+export type MonthlyCell = { staff_id: number; ym: string; minutes: number; pay: number }
+
+export async function getAllMonthlyTotals(): Promise<{ staff: { id: number; name: string; is_active: boolean }[]; cells: MonthlyCell[] }> {
+  const supabase = createServerClient()
+  const [shifts, { data: staff }] = await Promise.all([
+    getShiftsBetween('2000-01-01', '2100-01-01'),
+    supabase.from('staff').select('id, name, is_active'),
+  ])
+  const map = new Map<string, MonthlyCell>()
+  for (const s of shifts) {
+    const ym = s.work_date.slice(0, 7)
+    const key = `${s.staff_id}|${ym}`
+    const cell = map.get(key) ?? { staff_id: s.staff_id, ym, minutes: 0, pay: 0 }
+    cell.minutes += s.minutes
+    if (s.rate) cell.pay += (s.minutes / 60) * s.rate
+    map.set(key, cell)
+  }
+  const cells = [...map.values()].map((c) => ({ ...c, pay: Math.round(c.pay) }))
+  const ids = new Set(cells.map((c) => c.staff_id))
+  return { staff: ((staff ?? []) as { id: number; name: string; is_active: boolean }[]).filter((s) => ids.has(s.id)), cells }
 }

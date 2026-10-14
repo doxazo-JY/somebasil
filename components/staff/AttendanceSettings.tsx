@@ -3,15 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
-import type { PayRate } from '@/lib/supabase/queries/attendance-admin'
+import type { PayRate, SourcePriority } from '@/lib/supabase/queries/attendance-admin'
 
 const INPUT = 'text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]'
 
-// QR 기록 시작일 + 카운터 QR + 매장 공통 시급 (직원·설정 탭 아래쪽)
-export default function AttendanceSettings({ qrSecret, rates, qrStart }: { qrSecret: string | null; rates: PayRate[]; qrStart: string | null }) {
+// 기준 기록 + 카운터 QR + 매장 공통 시급 (직원·설정 탭 아래쪽)
+export default function AttendanceSettings({ qrSecret, rates, priority }: { qrSecret: string | null; rates: PayRate[]; priority: SourcePriority }) {
   return (
     <div className="space-y-4">
-      <QrStartDate qrStart={qrStart} />
+      <SourcePriorityPicker priority={priority} />
       <div className="grid md:grid-cols-2 gap-4 items-start">
         <CounterQr qrSecret={qrSecret} />
         <PayRates rates={rates} />
@@ -20,47 +20,48 @@ export default function AttendanceSettings({ qrSecret, rates, qrStart }: { qrSec
   )
 }
 
-// 근무일지·인건비 계산 출처 전환점
-function QrStartDate({ qrStart }: { qrStart: string | null }) {
+// 같은 날 종이 근무일지와 QR이 둘 다 있으면 어느 쪽으로 계산할지 (한쪽에만 있으면 있는 쪽)
+function SourcePriorityPicker({ priority }: { priority: SourcePriority }) {
   const router = useRouter()
-  const [date, setDate] = useState(qrStart ?? '')
   const [saving, setSaving] = useState(false)
 
-  async function save(value: string | null) {
+  async function save(value: SourcePriority) {
+    if (value === priority) return
     setSaving(true)
-    await fetch('/api/attendance/qr-start', {
+    await fetch('/api/attendance/source-priority', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: value }),
+      body: JSON.stringify({ priority: value }),
     })
     setSaving(false)
     router.refresh()
   }
 
+  const options: { key: SourcePriority; label: string; hint: string }[] = [
+    { key: 'paper', label: '종이 우선', hint: 'QR과 병행하는 동안' },
+    { key: 'qr', label: 'QR 우선', hint: 'QR로 넘어갈 때' },
+  ]
   return (
     <div className="bg-white rounded-xl border border-gray-100 px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
       <div className="flex-1 min-w-[240px]">
-        <p className="text-sm font-semibold text-gray-800">
-          QR 기록 시작일 <span className="ml-1 text-xs font-normal text-gray-500">{qrStart ? `${qrStart}부터 QR` : '미설정 · 전부 종이 근무일지'}</span>
-        </p>
+        <p className="text-sm font-semibold text-gray-800">기준 기록</p>
         <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
-          이 날짜 전은 업로드한 종이 근무일지, 이 날짜부터는 QR 출퇴근으로 인건비와 근무일지 엑셀을 만들어요. 병행 기간에는 비워 두세요.
+          같은 날 종이 근무일지와 QR 기록이 둘 다 있으면 어느 쪽으로 인건비·근무일지 엑셀을 만들지 정해요. 한쪽에만 있는 날은 있는 쪽을 써요.
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        <input id="qr-start-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={INPUT} />
-        <button
-          onClick={() => save(date)}
-          disabled={saving || !date || date === qrStart}
-          className="text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-40"
-        >
-          저장
-        </button>
-        {qrStart && (
-          <button onClick={() => { setDate(''); save(null) }} disabled={saving} className="text-xs px-3 py-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
-            해제
+      <div className="flex gap-1">
+        {options.map((o) => (
+          <button
+            key={o.key}
+            onClick={() => save(o.key)}
+            disabled={saving}
+            aria-pressed={priority === o.key}
+            className={`text-xs px-3 py-1.5 rounded-lg text-left ${priority === o.key ? 'bg-[#1a5c3a] text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+          >
+            <span className="font-semibold">{o.label}</span>
+            <span className={`block text-[10px] ${priority === o.key ? 'text-white/70' : 'text-gray-400'}`}>{o.hint}</span>
           </button>
-        )}
+        ))}
       </div>
     </div>
   )

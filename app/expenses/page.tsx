@@ -88,7 +88,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
-      <PageTabs group="settlement" />
+      <PageTabs group="analysis" />
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>

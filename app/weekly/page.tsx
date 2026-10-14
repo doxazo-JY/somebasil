@@ -5,6 +5,8 @@ import WeeklyKPICards from '@/components/weekly/WeeklyKPICards'
 import DailyBreakdownChart from '@/components/weekly/DailyBreakdownChart'
 import WeeklyCategoryMix from '@/components/weekly/WeeklyCategoryMix'
 import TopProductsCard from '@/components/income/TopProductsCard'
+import WeeklyAiNotes from '@/components/weekly/WeeklyAiNotes'
+import { getWeeklyAiNotes } from '@/lib/supabase/queries/ai'
 import {
   getWeekDetail,
   getRecentWeekOptions,
@@ -98,10 +100,11 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
 
   const prevDetail = await getWeekDetail(prevRange.start, cappedPrevEnd)
 
-  const [bankIncome, prevBankIncome, basis] = await Promise.all([
+  const [bankIncome, prevBankIncome, basis, aiNotes] = await Promise.all([
     getBankIncomeForRange(targetWeekOption.weekStart, targetWeekOption.weekEnd),
     getBankIncomeForRange(prevRange.start, cappedPrevEnd),
     getIncomeBasis(),
+    getWeeklyAiNotes(targetWeekOption.weekStart),
   ])
   const isBank = basis === 'bank'
 
@@ -129,7 +132,15 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* 첫 인사이트 한 줄 — 주 라벨 / 손익분기 갭 / 가장 큰 악화 */}
+      {/* 경영 AI가 이 주를 분석했으면 그 내용 (규칙 요약 배너 대신) + 이번 주 추천 — 회의 자료 한 장 */}
+      {(aiNotes.analysis.length > 0 || aiNotes.tips.length > 0) && (
+        <div className="mb-4">
+          <WeeklyAiNotes analysis={aiNotes.analysis} tips={aiNotes.tips} />
+        </div>
+      )}
+
+      {/* 첫 인사이트 한 줄 — 주 라벨 / 손익분기 갭 / 가장 큰 악화 (AI 분석이 없는 주에만) */}
+      {aiNotes.analysis.length === 0 && (
       <div className="mb-4">
         <WeeklyInsightBanner
           weekStart={detail.weekStart}
@@ -154,6 +165,7 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
           }}
         />
       </div>
+      )}
 
       {/* 주간 KPI 5개 */}
       <div className="mb-4">

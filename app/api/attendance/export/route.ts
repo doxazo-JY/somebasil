@@ -5,7 +5,7 @@ import {
   buildTimesheet,
   firstTimesheetMonth,
   getPayRates,
-  getQrStartDate,
+  getSourcePriority,
   type Timesheet,
   type TimesheetBlock,
 } from '@/lib/supabase/queries/attendance-admin'
@@ -17,7 +17,7 @@ export const runtime = 'nodejs'
 // 점장(관리 화면): 근무일지 엑셀 — 세무사 전달용. 관리 화면 로그인 대상
 // 지금 쓰는 파일처럼 누적: 기록이 있는 첫 달 ~ 선택한 달, 월마다 시트 하나 ("26년 10월")
 // 시트 구조 = "썸바실 YY년 M월 P.T. 근무일지": 평일 근무 블록 → 주일 근무 블록 → M월분 총 인건비(세전)
-// 날짜별 출처: QR 기록 시작일 전 = 종이 근무일지(업로드), 시작일부터 = QR (buildTimesheet 참고)
+// 날짜별 출처: 기준 기록(종이 우선/QR 우선)으로 직원·날짜마다 한쪽 (buildTimesheet · mergeShifts 참고)
 // 계산은 값으로 넣음 (수식 아님 — 미리보기/모바일에서도 숫자가 보이도록)
 
 const KIND_LABEL = { fixed_salary: '고정급', weekly_holiday_pay: '주휴수당', other: '기타' } as const
@@ -156,9 +156,9 @@ export async function GET(req: NextRequest) {
     }
     if (months.length === 0) months.push({ year, month })
 
-    const [rates, qrStart] = await Promise.all([getPayRates(), getQrStartDate()])
+    const [rates, priority] = await Promise.all([getPayRates(), getSourcePriority()])
     const sheets: Timesheet[] = []
-    for (const m of months) sheets.push(await buildTimesheet(m.year, m.month, { rates, qrStart }))
+    for (const m of months) sheets.push(await buildTimesheet(m.year, m.month, { rates, priority }))
 
     const wb = await XlsxPopulate.fromBlankAsync()
     sheets.forEach((ts, i) => {

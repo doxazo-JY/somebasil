@@ -76,7 +76,7 @@ export default async function MenuAnalysisPage({ searchParams }: PageProps) {
   if (params.view === 'cost') {
     return (
       <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
-        <PageTabs group="settlement" />
+        <PageTabs group="analysis" />
         <SubTabs items={VIEWS} />
         <RecipesView />
       </div>
@@ -106,7 +106,7 @@ export default async function MenuAnalysisPage({ searchParams }: PageProps) {
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
-      <PageTabs group="settlement" />
+      <PageTabs group="analysis" />
       <SubTabs items={VIEWS} />
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">메뉴 분석</h1>

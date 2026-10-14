@@ -4,11 +4,11 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 // 그룹 → 기본 랜딩 경로 + 포함 경로
-// 운영: 매일/매주 본다. 결산: 월말 본다. 관리: 데이터·인력 운영.
+// 운영: 매장 굴리기 (매일·수시 — 대시보드·주간·사무실·직원). 분석: 손익·지출·메뉴를 깊게. 데이터: 파일 넣기·고치기.
 const NAV_ITEMS = [
-  { label: '운영', href: '/', group: ['/', '/weekly', '/inbox', '/marketing'] },
-  { label: '결산', href: '/profit', group: ['/profit', '/expenses', '/menu'] },
-  { label: '관리', href: '/upload', group: ['/upload', '/staff'] },
+  { label: '운영', href: '/', group: ['/', '/weekly', '/inbox', '/marketing', '/staff'] },
+  { label: '분석', href: '/profit', group: ['/profit', '/expenses', '/menu'] },
+  { label: '데이터', href: '/upload', group: ['/upload'] },
 ]
 
 export default function Sidebar() {

@@ -107,3 +107,29 @@ export async function getRecentRuns(limit = 10): Promise<AiRun[]> {
   if (error) throw error
   return (data ?? []) as AiRun[]
 }
+
+// 주간 탭용 — 선택한 주(월~일)를 경영 AI가 분석한 것 + 그 다음 주(회의 주) 수요일 추천
+//   분석: ai_inbox agent=business, period=주 시작일 (처리 여부 무관, 가장 최근 실행만)
+//   추천: meta.type=tip, period 'tip:YYYY-MM-DD'가 다음 주 안 (가장 최근 실행만)
+export type WeeklyAiNote = Pick<InboxItem, 'id' | 'title' | 'body' | 'action' | 'severity' | 'status'>
+
+export async function getWeeklyAiNotes(weekStart: string): Promise<{ analysis: WeeklyAiNote[]; tips: WeeklyAiNote[] }> {
+  const supabase = createServerClient()
+  const next = new Date(`${weekStart}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 7)
+  const nextStart = next.toISOString().slice(0, 10)
+  next.setUTCDate(next.getUTCDate() + 6)
+  const nextEnd = next.toISOString().slice(0, 10)
+  const cols = 'id, run_id, title, body, action, severity, status, created_at'
+  const [{ data: analysis }, { data: tips }] = await Promise.all([
+    supabase.from('ai_inbox').select(cols).eq('agent', 'business').eq('period', weekStart).order('id'),
+    supabase.from('ai_inbox').select(cols).eq('agent', 'business').eq('meta->>type', 'tip').gte('period', `tip:${nextStart}`).lte('period', `tip:${nextEnd}`).order('id'),
+  ])
+  // 같은 주를 다시 분석했으면 처리한 예전 항목도 남아 있음 → 가장 최근 실행 것만
+  const latest = (rows: (WeeklyAiNote & { run_id: number | null })[] | null) => {
+    const list = rows ?? []
+    const runId = Math.max(...list.map((r) => r.run_id ?? 0))
+    return list.filter((r) => (r.run_id ?? 0) === runId).map((r) => ({ id: r.id, title: r.title, body: r.body, action: r.action, severity: r.severity, status: r.status }))
+  }
+  return { analysis: latest(analysis as never), tips: latest(tips as never) }
+}

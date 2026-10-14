@@ -2,7 +2,7 @@ import PageTabs from '@/components/ui/PageTabs'
 import MonthFilter from '@/components/ui/MonthFilter'
 import UploadSection from '@/components/upload/UploadSection'
 import UploadHistory from '@/components/upload/UploadHistory'
-import FixTabs from '@/components/upload/FixTabs'
+import SubTabs from '@/components/ui/SubTabs'
 import ReclassifyTable from '@/components/expenses/ReclassifyTable'
 import MasterManager from '@/components/menu/MasterManager'
 import { getUploadHistory } from '@/lib/supabase/queries/upload'
@@ -22,27 +22,47 @@ interface PageProps {
   searchParams: Promise<{ year?: string; month?: string; fix?: string }>
 }
 
-// 데이터 넣기 (파일 하나로 받기) + 데이터 고치기 (통장 분류 · 메뉴 목록 · 수동 조정 · 계산 기준)
+// 데이터 넣기 (파일 하나로 받기) + 데이터 고치기 (?fix= 통장 분류 · 메뉴 목록 · 수동 조정 · 계산 기준 — 고른 것만 불러옴)
+const FIXES = [
+  { key: 'bank', label: '통장 거래 분류' },
+  { key: 'menu', label: '메뉴 목록' },
+  { key: 'adjust', label: '수동 조정' },
+  { key: 'basis', label: '계산 기준' },
+]
 export default async function UploadPage({ searchParams }: PageProps) {
   const params = await searchParams
   const now = new Date()
   const year = Number(params.year ?? now.getFullYear())
   const month = Number(params.month ?? now.getMonth() + 1)
 
-  const [history, allTransactions, masterProducts, coverage, adjustments, incomeBasis] = await Promise.all([
-    getUploadHistory(),
-    getMonthlyAllTransactions(year, month),
-    getMasterProducts(),
-    getWeekCoverage(),
-    getManualAdjustments(),
-    getIncomeBasis(),
-  ])
+  const fix = FIXES.some((f) => f.key === params.fix) ? params.fix! : 'bank'
+  const [history, coverage] = await Promise.all([getUploadHistory(), getWeekCoverage()])
+
+  let fixView: React.ReactNode
+  if (fix === 'menu') fixView = <MasterManager products={await getMasterProducts()} />
+  else if (fix === 'adjust') fixView = <ManualAdjustments items={await getManualAdjustments()} />
+  else if (fix === 'basis')
+    fixView = (
+      <div className="space-y-6 max-w-3xl">
+        <IncomeBasisToggle initialValue={await getIncomeBasis()} />
+        <RecalcButton />
+      </div>
+    )
+  else
+    fixView = (
+      <>
+        <div className="flex justify-end mb-3">
+          <MonthFilter year={year} month={month} />
+        </div>
+        <ReclassifyTable items={await getMonthlyAllTransactions(year, month)} />
+      </>
+    )
   // 체크리스트 문구용 — 이번 주 자동 분석을 이미 했는지 (AI는 실행하지 않음)
   const { weeklyDone } = await pickAgentsAfterUpload(coverage, false).catch(() => ({ weeklyDone: false }))
 
   return (
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
-      <PageTabs group="admin" />
+      <PageTabs group="data" />
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">데이터 넣기</h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">받은 파일을 끌어다 놓으면 종류를 알아보고 바로 저장해요</p>
@@ -57,27 +77,8 @@ export default async function UploadPage({ searchParams }: PageProps) {
           <h2 className="text-base font-semibold text-gray-900">데이터 고치기</h2>
         </div>
         <div className="hidden md:block">
-          <FixTabs
-            initial={params.fix}
-            views={{
-              bank: (
-                <>
-                  <div className="flex justify-end mb-3">
-                    <MonthFilter year={year} month={month} />
-                  </div>
-                  <ReclassifyTable items={allTransactions} />
-                </>
-              ),
-              menu: <MasterManager products={masterProducts} />,
-              adjust: <ManualAdjustments items={adjustments} />,
-              basis: (
-                <div className="space-y-6 max-w-3xl">
-                  <IncomeBasisToggle initialValue={incomeBasis} />
-                  <RecalcButton />
-                </div>
-              ),
-            }}
-          />
+          <SubTabs items={FIXES} param="fix" />
+          {fixView}
         </div>
         <p className="md:hidden text-xs text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-lg [word-break:keep-all]">
           💻 데이터 고치기는 PC에서 할 수 있어요
