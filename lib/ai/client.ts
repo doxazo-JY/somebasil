@@ -11,6 +11,8 @@ import { createServerClient } from '@/lib/supabase/server'
 //   미설정이면 키가 있는 쪽 (둘 다 있으면 anthropic)
 //   - anthropic: ANTHROPIC_API_KEY, 모델 Claude Opus 5.5
 //   - openai:    OPENAI_API_KEY + OPENAI_MODEL (키로 쓸 수 있는 모델 이름)
+//                OPENAI_MODEL_CHAT (선택) = 자주 쓰는 가벼운 일 전용 모델 — 비서 채팅·원가 답 정리 (비우면 OPENAI_MODEL)
+//                예: OPENAI_MODEL=gpt-6-astra (분석), OPENAI_MODEL_CHAT=gpt-6.1-sol (채팅)
 // 에이전트는 generateStructured()만 쓰므로 AI를 바꿔도 에이전트 코드는 그대로
 
 export const ANTHROPIC_MODEL = 'claude-opus-5-5'
@@ -38,6 +40,12 @@ export function aiConfigProblem(): string | null {
 let anthropicClient: Anthropic | null = null
 let openaiClient: OpenAI | null = null
 
+// tier 'chat' = 자주 쓰는 가벼운 일 (비서 채팅·원가 답 정리) → OPENAI_MODEL_CHAT, 없으면 기본 모델
+export type ModelTier = 'default' | 'chat'
+function openaiModel(tier: ModelTier = 'default') {
+  return (tier === 'chat' && process.env.OPENAI_MODEL_CHAT) || process.env.OPENAI_MODEL!
+}
+
 type StructuredResult<T> = { output: T; model: string; usage: { input_tokens: number; output_tokens: number } }
 
 // 시스템 지시 + 사용자 메시지 → 스키마에 맞는 JSON 결과
@@ -46,6 +54,7 @@ export async function generateStructured<S extends z.ZodType>(opts: {
   user: string
   schema: S
   name: string // 결과 형식 이름 (영문 snake_case)
+  tier?: ModelTier
 }): Promise<StructuredResult<z.infer<S>>> {
   const problem = aiConfigProblem()
   if (problem) throw new Error(problem)
@@ -53,7 +62,7 @@ export async function generateStructured<S extends z.ZodType>(opts: {
   if (aiProvider() === 'openai') {
     openaiClient ??= new OpenAI()
     const completion = await openaiClient.chat.completions.parse({
-      model: process.env.OPENAI_MODEL!,
+      model: openaiModel(opts.tier),
       messages: [
         { role: 'system', content: opts.system },
         { role: 'user', content: opts.user },
@@ -152,7 +161,7 @@ export async function runToolChat(opts: { system: string; turns: ChatTurn[]; too
     }))
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const response = await openaiClient.responses.create({
-        model: process.env.OPENAI_MODEL!,
+        model: openaiModel('chat'),
         instructions: opts.system,
         input,
         tools,

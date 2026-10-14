@@ -108,6 +108,7 @@ export async function proposeFromAnswer(itemId: number, answer: string) {
       }),
       schema: ParseSchema,
       name: 'cost_answer',
+      tier: 'chat', // 답 정리는 가벼운 일 — 채팅용 모델
     })
     return { summary: `답 정리: ${meta.name}`, output, usage, model }
   })
