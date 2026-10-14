@@ -1,11 +1,13 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { recalcMonthlySummary } from '@/lib/supabase/recalc'
+import { fetchAllRows } from '@/lib/supabase/fetchAll'
 import type { DailySalesRow } from './daily-sales'
 import type { BankRow } from './bank'
 import type { MenuRow } from './menu'
 
 // 통합 업로드 저장 — 같은 파일을 다시 넣어도 중복되지 않음
-//   매출: (date, order_id, line_no, source) 기준 덮어쓰기 (POS가 기준)
+//   매출: 파일이 담은 기간을 파일 내용으로 맞춤 — (date, order_id, line_no) 덮어쓰기 → 그 기간에서 파일에 없는 줄 삭제
+//         (나중에 취소된 주문, 판매 금액 0원 서비스, 예전 방식으로 잘못 들어간 줄 정리. 덮어쓴 뒤 지워서 도중에 끊겨도 데이터가 비지 않음)
 //   통장 입금: (tx_time, balance_after) 기준 덮어쓰기
 //   통장 출금: 이미 있는 거래는 건드리지 않음 → 점장이 재분류한 카테고리가 다시 올려도 유지됨
 
@@ -20,14 +22,28 @@ async function recalcMonths(supabase: Supabase, dates: string[]) {
   }
 }
 
-export async function saveDailySales(rows: DailySalesRow[]) {
+// from~to = 파일이 담은 기간 (파일명 기간, 없으면 들어 있는 날짜 범위). 반환: 정리한 옛 줄 수
+export async function saveDailySales(rows: DailySalesRow[], from: string, to: string): Promise<{ removed: number }> {
   const supabase = createServerClient()
   const withSource = rows.map((r) => ({ ...r, source: 'pos' }))
   for (let i = 0; i < withSource.length; i += CHUNK) {
     const { error } = await supabase.from('daily_sales').upsert(withSource.slice(i, i + CHUNK), { onConflict: 'date,order_id,line_no,source' })
     if (error) throw new Error(`매출 저장 실패: ${error.message}`)
   }
-  await recalcMonths(supabase, rows.map((r) => r.date))
+
+  // 그 기간에서 파일에 없는 줄 삭제
+  const keep = new Set(rows.map((r) => `${r.date}|${r.order_id}|${r.line_no}`))
+  const existing = await fetchAllRows<{ id: number; date: string; order_id: string; line_no: number }>((a, b) =>
+    supabase.from('daily_sales').select('id, date, order_id, line_no').eq('source', 'pos').gte('date', from).lte('date', to).range(a, b)
+  )
+  const stale = existing.filter((r) => !keep.has(`${r.date}|${r.order_id}|${r.line_no}`)).map((r) => r.id)
+  for (let i = 0; i < stale.length; i += CHUNK) {
+    const { error } = await supabase.from('daily_sales').delete().in('id', stale.slice(i, i + CHUNK))
+    if (error) throw new Error(`옛 매출 줄 정리 실패: ${error.message}`)
+  }
+
+  await recalcMonths(supabase, [...rows.map((r) => r.date), ...existing.filter((r) => stale.includes(r.id)).map((r) => r.date)])
+  return { removed: stale.length }
 }
 
 export type UncertainTx = { id: number; date: string; memo: string; counterpart: string; amount: number; category: string }

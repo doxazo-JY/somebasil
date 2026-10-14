@@ -65,8 +65,11 @@ export async function POST(req: NextRequest) {
     if (kind === 'daily_sales') {
       const { rows, from, to } = parseDailySales(buffer, file.name)
       if (rows.length === 0) throw new UploadError('매출 줄을 찾지 못했어요')
-      await saveDailySales(rows)
-      result = { kind, label: LABEL[kind], from, to, summary: `${span(from, to)} · ${rows.length.toLocaleString()}줄` }
+      const saved = await saveDailySales(rows, from!, to!)
+      result = {
+        kind, label: LABEL[kind], from, to,
+        summary: `${span(from, to)} · ${rows.length.toLocaleString()}줄${saved.removed ? ` · 파일에 없는 옛 줄 ${saved.removed}개 정리` : ''}`,
+      }
     } else if (kind === 'bank_transaction') {
       const { rows, from, to } = parseBank(wb)
       const saved = await saveBank(rows)
