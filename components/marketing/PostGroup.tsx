@@ -17,13 +17,14 @@ function fmtDate(iso: string) {
 }
 
 // 한 주제의 인스타·블로그 초안 묶음 — 탭으로 전환, 수정 → 승인 → 복사 → 게시 완료
+// 2열 카드에서 높이가 맞도록 본문 칸 높이 고정 (긴 글은 칸 안에서 스크롤)
 export default function PostGroup({ topic, source, created_at, posts }: { topic: string; source: 'auto' | 'manual'; created_at: string; posts: MarketingPost[] }) {
   const [active, setActive] = useState(posts[0]?.id)
   const post = posts.find((p) => p.id === active) ?? posts[0]
   if (!post) return null
 
   return (
-    <article className="bg-white rounded-xl border border-gray-100">
+    <article className="bg-white rounded-xl border border-gray-100 h-full flex flex-col">
       <div className="px-5 pt-4 pb-3 space-y-1">
         <div className="flex items-center gap-2 text-[11px] text-gray-400">
           <span>{fmtDate(created_at)}</span>
@@ -58,6 +59,7 @@ function PostEditor({ post }: { post: MarketingPost }) {
   const [hashtags, setHashtags] = useState(post.hashtags ?? '')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const dirty = body !== post.body || title !== (post.title ?? '') || hashtags !== (post.hashtags ?? '')
   const hasBlank = /\[[^\]]+\]/.test(body + title)
 
@@ -84,7 +86,6 @@ function PostEditor({ post }: { post: MarketingPost }) {
   }
 
   async function remove() {
-    if (!confirm('이 초안을 삭제할까요?')) return
     await fetch('/api/ai/marketing', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -97,7 +98,7 @@ function PostEditor({ post }: { post: MarketingPost }) {
   const locked = post.status === 'posted'
 
   return (
-    <div className="px-5 py-4 space-y-3">
+    <div className="px-5 py-4 space-y-3 flex-1 flex flex-col">
       {post.channel === 'blog' && (
         <input id={`post-title-${post.id}`} value={title} onChange={(e) => setTitle(e.target.value)} disabled={locked} className={`${field} font-semibold`} aria-label="블로그 제목" />
       )}
@@ -106,8 +107,8 @@ function PostEditor({ post }: { post: MarketingPost }) {
         value={body}
         onChange={(e) => setBody(e.target.value)}
         disabled={locked}
-        rows={post.channel === 'blog' ? 14 : 8}
-        className={`${field} leading-relaxed`}
+        rows={10}
+        className={`${field} leading-relaxed resize-none flex-1 min-h-[220px]`}
         aria-label="본문"
       />
       {post.channel === 'instagram' && (
@@ -118,9 +119,16 @@ function PostEditor({ post }: { post: MarketingPost }) {
       )}
 
       <div className="flex flex-wrap justify-end gap-2">
-        {post.status === 'draft' && (
-          <button onClick={remove} disabled={busy} className="text-xs px-3 py-1.5 rounded-lg text-gray-400 hover:bg-gray-100 mr-auto">삭제</button>
-        )}
+        {post.status === 'draft' &&
+          (confirmDelete ? (
+            <span className="mr-auto flex items-center gap-1 text-xs text-gray-500">
+              삭제할까요?
+              <button onClick={remove} disabled={busy} className="px-2 py-1.5 rounded-lg text-red-500 font-semibold hover:bg-red-50">삭제</button>
+              <button onClick={() => setConfirmDelete(false)} className="px-2 py-1.5 rounded-lg text-gray-400 hover:bg-gray-100">취소</button>
+            </span>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} disabled={busy} className="text-xs px-3 py-1.5 rounded-lg text-gray-400 hover:bg-gray-100 mr-auto">삭제</button>
+          ))}
         {dirty && !locked && (
           <button onClick={() => patch({ title, body, hashtags })} disabled={busy} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
             수정 저장
