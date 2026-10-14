@@ -45,7 +45,7 @@ function buildRows(ts: Timesheet, logs: AdminLog[]): Row[] {
   }
   // 알바생이 아니어도 QR 기록이 있으면 줄을 보여 줌 (고치기용)
   for (const l of logs) get(l.staff_id, l.staff_name)
-  for (const i of ts.payrollItems) get(i.staff_id, i.staff_id == null ? '고정급·기타' : (rows.get(i.staff_id)?.name ?? i.staff_name ?? i.label)).items.push(i)
+  for (const i of ts.payrollItems) get(i.staff_id, i.staff_id == null ? '고정급·기타' : (rows.get(i.staff_id)?.name ?? i.label)).items.push(i)
   return [...rows.values()].sort((a, b) => (a.id == null ? 1 : b.id == null ? -1 : b.pay + sum(b.items) - (a.pay + sum(a.items))))
 }
 

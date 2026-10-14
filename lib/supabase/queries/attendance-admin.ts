@@ -38,7 +38,6 @@ export type PayrollItem = {
   kind: 'fixed_salary' | 'weekly_holiday_pay' | 'other'
   label: string
   amount: number
-  staff_name?: string | null // 연결된 직원 이름 (그 달 근무 기록이 없어도 줄 이름으로)
 }
 
 export function monthRange(year: number, month: number) {
@@ -128,13 +127,13 @@ export async function getPayrollItems(year: number, month: number): Promise<Payr
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('payroll_items')
-    .select('id, year, month, staff_id, kind, label, amount, staff:staff_id (name)')
+    .select('id, year, month, staff_id, kind, label, amount')
     .eq('year', year)
     .eq('month', month)
     .order('kind')
     .order('id')
   if (error) throw error
-  return (data ?? []).map(({ staff, ...i }) => ({ ...i, staff_name: (Array.isArray(staff) ? staff[0] : staff)?.name ?? null })) as PayrollItem[]
+  return (data ?? []) as PayrollItem[]
 }
 
 // 날짜에 적용되는 시급 (effective_from <= 날짜 중 최신). rates는 최신순 정렬 가정
