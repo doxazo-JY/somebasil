@@ -9,6 +9,8 @@ import HourlyLaborSection from '@/components/diagnosis/HourlyLaborSection'
 import { getDiagnosisMonths } from '@/lib/supabase/queries/diagnosis'
 import { getHourlyLaborEfficiency } from '@/lib/supabase/queries/labor'
 import { buildBaseline, diagnose, profitTargets } from '@/lib/diagnosis-calc'
+import { buildTimesheet, getPayRates, getSourcePriority } from '@/lib/supabase/queries/attendance-admin'
+import LaborBasisNote, { type LaborSource } from '@/components/diagnosis/LaborBasisNote'
 
 // 기준 기간 — 최근 3개월 평균 (한 달 튀는 값에 덜 흔들리게)
 const BASELINE_MONTHS = 3
@@ -25,8 +27,24 @@ export default async function DiagnosisView() {
     getDiagnosisMonths(),
     getHourlyLaborEfficiency(BASELINE_MONTHS),
   ])
-  const baseline = buildBaseline(months, BASELINE_MONTHS)
+  // 인건비는 "그 달에 일한 만큼" — 직원 화면 계산(근무 기록 + 고정급·주휴)이 있는 달은 그 값,
+  // 근무 기록이 없는 달만 통장 급여 (통장 급여는 보통 다음 달 10일쯤 나가서 한 달씩 밀림)
+  const bankBaseline = buildBaseline(months, BASELINE_MONTHS)
+  const [rates, priority] = await Promise.all([getPayRates(), getSourcePriority()])
+  const laborSources: LaborSource[] = await Promise.all(
+    (bankBaseline?.months ?? []).map(async ({ year, month }) => {
+      const bank = months.find((m) => m.year === year && m.month === month)?.labor ?? 0
+      const ts = await buildTimesheet(year, month, { rates, priority })
+      return ts.shifts.length > 0 ? { year, month, amount: ts.total, source: 'work' as const, bank } : { year, month, amount: bank, source: 'bank' as const, bank }
+    })
+  )
+  const adjusted = months.map((m) => {
+    const l = laborSources.find((x) => x.year === m.year && x.month === m.month)
+    return l ? { ...m, labor: l.amount } : m
+  })
+  const baseline = buildBaseline(adjusted, BASELINE_MONTHS)
   const result = baseline ? diagnose(baseline) : null
+  const bankResult = bankBaseline ? diagnose(bankBaseline) : null
 
   const trend = months
     .filter((m) => m.operatingDays > 0 && m.orderCount > 0)
@@ -49,6 +67,7 @@ export default async function DiagnosisView() {
       {baseline && result ? (
         <>
           <BreakEvenCards baseline={baseline} result={result} />
+          <LaborBasisNote sources={laborSources} breakEven={result.breakEvenSales} bankBreakEven={bankResult?.breakEvenSales ?? null} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 items-start">
             <LeverTable baseline={baseline} result={result} />
             <ProfitTargetTable

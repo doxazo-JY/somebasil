@@ -43,6 +43,7 @@
 - `/profit` — 손익. 보기 2개(`?view=`): 월별 손익(YTD) / 흑자 조건(`check`, `components/diagnosis/DiagnosisView`)
 - `/expenses` — 지출
 - `/menu` — 메뉴. 보기 2개: 판매 패턴(히트맵 / 죽은 메뉴) / 원가(`?view=cost`, `components/recipes/RecipesView`)
+- 흑자 조건 인건비 = 기준 달마다 직원 화면 계산(`buildTimesheet().total`, 그 달 근무 기록이 있을 때) · 없으면 통장 labor. 카드 아래 `LaborBasisNote`에 "n~m월 평균 기준" + 달별 인건비 출처 + 통장 급여로만 봤을 때 손익분기 (10/16)
 - 흑자 조건(예전 `/diagnosis`) = 고정비/변동비 손익분기 · 하루 필요 고객 · 목표 이익 · 고객수×객단가 · 시간대별 매출 vs 알바 인원 · 못 보는 항목과 이유
 
 **데이터** (탭 1개라 탭 줄 숨김):
