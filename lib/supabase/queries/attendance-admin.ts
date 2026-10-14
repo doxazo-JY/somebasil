@@ -106,6 +106,23 @@ export async function getPayRates(): Promise<PayRate[]> {
   return (data ?? []) as PayRate[]
 }
 
+// 매달 고정급 (점장 등) — system_settings.monthly_fixed_salary = [{ from: 'YYYY-MM', label, amount }] (바뀐 기록)
+//   그 달에 적용되는 것 = from <= 그 달 중 가장 최근. 금액을 바꾸면 그 달부터 새 금액, 지난달은 예전 금액 그대로
+//   그 달에 손으로 넣은 고정급(payroll_items kind=fixed_salary)이 있으면 자동 금액은 넣지 않음 (이중 계산 방지)
+export type FixedSalaryEntry = { from: string; label: string; amount: number }
+
+export async function getFixedSalaryHistory(): Promise<FixedSalaryEntry[]> {
+  const supabase = createServerClient()
+  const { data } = await supabase.from('system_settings').select('value').eq('key', 'monthly_fixed_salary').maybeSingle()
+  const list = Array.isArray(data?.value) ? (data.value as FixedSalaryEntry[]) : []
+  return list.filter((e) => /^\d{4}-\d{2}$/.test(e.from) && typeof e.amount === 'number').sort((a, b) => a.from.localeCompare(b.from))
+}
+
+export function fixedSalaryFor(history: FixedSalaryEntry[], ym: string): FixedSalaryEntry | null {
+  const e = [...history].reverse().find((h) => h.from <= ym)
+  return e && e.amount > 0 ? e : null
+}
+
 export async function getPayrollItems(year: number, month: number): Promise<PayrollItem[]> {
   const supabase = createServerClient()
   const { data, error } = await supabase
@@ -279,8 +296,14 @@ export async function buildTimesheet(
 ): Promise<Timesheet> {
   const { start, end } = monthRange(year, month)
   const [rates, priority] = pre ? [pre.rates, pre.priority] : await Promise.all([getPayRates(), getSourcePriority()])
-  const [paper, qr, payrollItems] = await Promise.all([paperShifts(start, end), qrShifts(start, end, rates), getPayrollItems(year, month)])
+  const [paper, qr, manualItems, fixedHistory] = await Promise.all([paperShifts(start, end), qrShifts(start, end, rates), getPayrollItems(year, month), getFixedSalaryHistory()])
   const shifts = mergeShifts(paper, qr, priority)
+  // 매달 고정급 — 그 달에 손으로 넣은 고정급이 없을 때만 (id 음수 = 자동, 화면에서 지울 수 없음)
+  const fixed = fixedSalaryFor(fixedHistory, start.slice(0, 7))
+  const payrollItems: PayrollItem[] =
+    fixed && !manualItems.some((i) => i.kind === 'fixed_salary')
+      ? [...manualItems, { id: -1, year, month, staff_id: null, kind: 'fixed_salary', label: fixed.label, amount: fixed.amount }]
+      : manualItems
 
   const dates: string[] = []
   for (let d = new Date(`${start}T00:00:00Z`); d.toISOString().slice(0, 10) < end; d = new Date(d.getTime() + 86400000)) {

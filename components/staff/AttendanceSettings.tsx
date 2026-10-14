@@ -3,15 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
-import type { PayRate, SourcePriority } from '@/lib/supabase/queries/attendance-admin'
+import type { FixedSalaryEntry, PayRate, SourcePriority } from '@/lib/supabase/queries/attendance-admin'
 
 const INPUT = 'text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a]'
 
-// 기준 기록 + 카운터 QR + 매장 공통 시급 (직원·설정 탭 아래쪽)
-export default function AttendanceSettings({ qrSecret, rates, priority }: { qrSecret: string | null; rates: PayRate[]; priority: SourcePriority }) {
+// 기준 기록 + 매달 고정급 + 카운터 QR + 매장 공통 시급 (직원·설정 탭 아래쪽)
+export default function AttendanceSettings({ qrSecret, rates, priority, fixedHistory }: { qrSecret: string | null; rates: PayRate[]; priority: SourcePriority; fixedHistory: FixedSalaryEntry[] }) {
   return (
     <div className="space-y-4">
       <SourcePriorityPicker priority={priority} />
+      <FixedSalary history={fixedHistory} />
       <div className="grid md:grid-cols-2 gap-4 items-start">
         <CounterQr qrSecret={qrSecret} />
         <PayRates rates={rates} />
@@ -64,6 +65,52 @@ function SourcePriorityPicker({ priority }: { priority: SourcePriority }) {
         ))}
       </div>
     </div>
+  )
+}
+
+// 매달 고정급 — 정해 두면 모든 달 인건비·근무일지 엑셀에 자동으로 (바꾸면 이번 달부터, 지난달은 그대로)
+function FixedSalary({ history }: { history: FixedSalaryEntry[] }) {
+  const router = useRouter()
+  const current = history.at(-1)
+  const [label, setLabel] = useState(current?.label ?? '점장 고정급')
+  const [amount, setAmount] = useState(current ? String(current.amount) : '')
+  const [saving, setSaving] = useState(false)
+  const changed = !current || label.trim() !== current.label || Number(amount.replace(/,/g, '')) !== current.amount
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    await fetch('/api/attendance/fixed-salary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, amount }),
+    })
+    setSaving(false)
+    router.refresh()
+  }
+
+  return (
+    <form onSubmit={save} className="bg-white rounded-xl border border-gray-100 px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="flex-1 min-w-[240px]">
+        <p className="text-sm font-semibold text-gray-800">
+          매달 고정급{' '}
+          <span className="ml-1 text-xs font-normal text-gray-500">
+            {current && current.amount > 0 ? `${current.label} ${current.amount.toLocaleString('ko-KR')}원 · 매달 자동` : '없음'}
+          </span>
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
+          점장처럼 매달 같은 금액을 받는 고정급이에요. 모든 달 인건비와 근무일지 엑셀에 자동으로 들어가요. 금액을 바꾸면 이번 달부터 적용되고 지난달은 그대로예요.
+          {history.length > 1 && ` 바뀐 기록: ${history.map((h) => `${h.from === '2000-01' ? '처음' : h.from}부터 ${h.amount.toLocaleString('ko-KR')}원`).join(' → ')}`}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input id="fixed-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="이름 (예: 점장 고정급)" required className={`${INPUT} w-32`} />
+        <input id="fixed-amount" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="금액" inputMode="numeric" required className={`${INPUT} w-28`} />
+        <button type="submit" disabled={saving || !changed} className="text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-40">
+          저장
+        </button>
+      </div>
+    </form>
   )
 }
 

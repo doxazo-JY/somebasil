@@ -9,6 +9,7 @@ import AttendanceSettings from '@/components/staff/AttendanceSettings'
 import {
   buildTimesheet,
   getAllMonthlyTotals,
+  getFixedSalaryHistory,
   getMonthLogs,
   getOpenLogs,
   getPayRates,
@@ -45,11 +46,11 @@ export default async function StaffPage({ searchParams }: PageProps) {
 
   let body: React.ReactNode
   if (view === 'settings') {
-    const [qrSecret, rates, priority] = await Promise.all([getQrSecret(), getPayRates(), getSourcePriority()])
+    const [qrSecret, rates, priority, fixedHistory] = await Promise.all([getQrSecret(), getPayRates(), getSourcePriority(), getFixedSalaryHistory()])
     body = (
       <div className="space-y-4">
         <StaffDeviceList staff={staff} />
-        <AttendanceSettings qrSecret={qrSecret} rates={rates} priority={priority} />
+        <AttendanceSettings qrSecret={qrSecret} rates={rates} priority={priority} fixedHistory={fixedHistory} />
       </div>
     )
   } else {

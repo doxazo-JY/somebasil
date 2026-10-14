@@ -102,6 +102,7 @@
 - `attendance_logs` — 출퇴근 기록. clock_out null = 근무 중. qr_clock_* = QR 원래 시각 보존, edited_at = 점장 수정
 - `pay_rates` — 매장 공통 시급 이력 (평일 / 주일). effective_from <= 날짜 중 최신
 - `payroll_items` — 월 인건비 요약 수기 항목 (fixed_salary | weekly_holiday_pay | other). source: 'manual'(점장 입력) | 'worklog'(근무일지 업로드 시 각 시트 "○월분 총 인건비" 칸의 고정급·주휴 줄 — 재업로드 시 그 달 worklog 행만 교체)
+- **매달 고정급** (`system_settings.monthly_fixed_salary` = [{from: YYYY-MM, label, amount}] 바뀐 기록, 10/16): 점장 고정급 1,050,000원(처음부터). `buildTimesheet()`가 그 달에 손으로 넣은 고정급이 없으면 자동 항목(id -1)으로 더함 → 인건비·근무일지 엑셀 포함. 직원·설정 탭에서 바꾸면 이번 달부터 (지난달 그대로). 예전 "지난달 고정급 가져오기" 버튼·copy API 제거. ※ 10/16 전까지 payroll_items는 0건이었음 (점장 급여가 인건비에서 빠져 있었음)
 - `staff.link_token_hash / link_token_expires_at` — 기존 직원 첫 연결·폰 교체 때 점장이 만드는 연결 QR (10분, 1회용). 연결하면 3분 입장권도 같이 발급 → 바로 /clock 출근 화면
 - `system_settings.attendance_qr_secret` — 카운터 고정 QR 비밀값
 - 첫 스캔 = 새 직원 등록만 (이름 입력, 기존 이름이면 차단). 기존 직원 연결은 점장 연결 QR로만. PIN 없음

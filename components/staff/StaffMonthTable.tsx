@@ -45,7 +45,7 @@ function buildRows(ts: Timesheet, logs: AdminLog[]): Row[] {
   }
   // 알바생이 아니어도 QR 기록이 있으면 줄을 보여 줌 (고치기용)
   for (const l of logs) get(l.staff_id, l.staff_name)
-  for (const i of ts.payrollItems) get(i.staff_id, i.staff_id == null ? '공통 항목' : (rows.get(i.staff_id)?.name ?? i.label)).items.push(i)
+  for (const i of ts.payrollItems) get(i.staff_id, i.staff_id == null ? '고정급·기타' : (rows.get(i.staff_id)?.name ?? i.label)).items.push(i)
   return [...rows.values()].sort((a, b) => (a.id == null ? 1 : b.id == null ? -1 : b.pay + sum(b.items) - (a.pay + sum(a.items))))
 }
 
@@ -72,7 +72,6 @@ export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, toda
   staffOptions: { id: number; name: string }[]
   today: string
 }) {
-  const router = useRouter()
   const rows = buildRows(ts, logs)
   const [open, setOpen] = useState<number | null | undefined>(undefined)
   const narrow = useNarrow()
@@ -82,22 +81,7 @@ export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, toda
   const gridTotals = Object.fromEntries(
     rows.filter((r) => r.id != null).map((r) => [r.id, { minutes: r.weekdayMin + r.sundayMin, pay: r.pay + sum(r.items) }])
   )
-  const [msg, setMsg] = useState<string | null>(null)
   const missing = openLogs.filter((l) => l.work_date < today)
-  const prevMonth = ts.month === 1 ? 12 : ts.month - 1
-
-  async function copyPrev() {
-    setMsg(null)
-    const res = await fetch('/api/attendance/payroll-items/copy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ year: ts.year, month: ts.month }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setMsg('가져오지 못했어요')
-    setMsg(data.copied > 0 ? `${prevMonth}월 고정급 ${data.copied}건을 가져왔어요` : data.found > 0 ? '이미 다 들어 있어요' : `${prevMonth}월에 고정급 항목이 없어요`)
-    router.refresh()
-  }
 
   return (
     <div className="space-y-3">
@@ -131,11 +115,7 @@ export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, toda
               {mode === 'date' ? '종이 근무일지와 같은 모양 · ' : '이름을 누르면 날짜별 출퇴근과 고정급·주휴수당 넣기가 열려요 · '}
               시급 평일 {ts.rates.weekday ? won(ts.rates.weekday) : '미등록'} · 주일 {ts.rates.sunday ? won(ts.rates.sunday) : '미등록'}
             </p>
-            {msg && <p className="text-xs text-[#1a5c3a] mt-1">{msg}</p>}
           </div>
-          <button onClick={copyPrev} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 whitespace-nowrap shrink-0">
-            {prevMonth}월 고정급 가져오기
-          </button>
         </div>
 
         {mode === 'date' ? (
@@ -424,7 +404,9 @@ function ItemsEditor({ year, month, staffId, staffName, items }: { year: number;
               <span className="text-gray-400 w-14 shrink-0">{KIND_LABEL[i.kind]}</span>
               <span className="text-gray-900 flex-1">{i.label}</span>
               <span className="tabular-nums text-gray-900">{won(i.amount)}원</span>
-              {confirmId === i.id ? (
+              {i.id < 0 ? (
+                <span className="text-[10px] text-gray-400 whitespace-nowrap" title="직원·설정 탭의 매달 고정급">매달 자동</span>
+              ) : confirmId === i.id ? (
                 <button onClick={() => remove(i.id)} className="text-red-500 font-semibold">삭제</button>
               ) : (
                 <button onClick={() => setConfirmId(i.id)} className="text-gray-300 hover:text-red-400" aria-label={`${i.label} 삭제`}>×</button>
