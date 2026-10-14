@@ -31,12 +31,14 @@ export async function saveDailySales(rows: DailySalesRow[], from: string, to: st
     if (error) throw new Error(`매출 저장 실패: ${error.message}`)
   }
 
-  // 그 기간에서 파일에 없는 줄 삭제
+  // 파일에 매출이 있는 날짜만, 파일에 없는 줄 삭제
+  //   (파일에 아예 없는 날짜는 건드리지 않음 — 파일이 덜 받아졌어도 기존 매출이 지워지지 않게)
   const keep = new Set(rows.map((r) => `${r.date}|${r.order_id}|${r.line_no}`))
+  const fileDates = new Set(rows.map((r) => r.date))
   const existing = await fetchAllRows<{ id: number; date: string; order_id: string; line_no: number }>((a, b) =>
     supabase.from('daily_sales').select('id, date, order_id, line_no').eq('source', 'pos').gte('date', from).lte('date', to).range(a, b)
   )
-  const stale = existing.filter((r) => !keep.has(`${r.date}|${r.order_id}|${r.line_no}`)).map((r) => r.id)
+  const stale = existing.filter((r) => fileDates.has(r.date) && !keep.has(`${r.date}|${r.order_id}|${r.line_no}`)).map((r) => r.id)
   for (let i = 0; i < stale.length; i += CHUNK) {
     const { error } = await supabase.from('daily_sales').delete().in('id', stale.slice(i, i + CHUNK))
     if (error) throw new Error(`옛 매출 줄 정리 실패: ${error.message}`)
