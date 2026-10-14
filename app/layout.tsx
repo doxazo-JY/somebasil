@@ -26,7 +26,8 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <Sidebar />
         </Suspense>
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">{children}</main>
+        {/* 스크롤바 자리를 항상 비워 둠 — 내용 길이에 따라 스크롤바가 생겼다 사라지며 화면 폭이 흔들리지 않게 */}
+        <main className="flex-1 overflow-y-auto [scrollbar-gutter:stable] pb-16 md:pb-0">{children}</main>
         {/* 오른쪽 아래 비서 AI 버튼 (출퇴근 화면 제외) */}
         <Suspense fallback={null}>
           <FloatingAssistant />
