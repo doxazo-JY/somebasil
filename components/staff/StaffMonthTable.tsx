@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import type { AdminLog, PayrollItem, Shift, Timesheet } from '@/lib/supabase/queries/attendance-admin'
 import { fmtHm, fmtTime, fmtWorkDate, toHhmm } from '@/lib/attendance/format'
+import StaffDateGrid from './StaffDateGrid'
 
-// 직원별 이번 달 — 예전 "출퇴근 기록" + "직원별 합계" + "수기 항목"을 한 표로
-//   한 줄 = 한 사람의 이번 달 합계 (근무일·평일·주일·지급액·수기 항목·합계)
+// 직원별 이번 달 — 예전 "출퇴근 기록" + "직원별 합계" + "수기 항목"을 한 표로. 보기 2개:
+//   날짜별(넓은 화면 기본): 종이 근무일지와 같은 모양 (StaffDateGrid) — 병행 기간 근태 맞춰 보기
+//   사람별(폰 기본): 한 줄 = 한 사람의 이번 달 합계 (근무일·평일·주일·지급액·수기 항목·합계) — 월말 급여
 //   누르면 그 사람의 날짜별 출퇴근 (종이/QR 표시, QR만 고치기) + 수기 항목 넣기
 //   기준 기록(종이 우선/QR 우선)에 밀려 계산에 안 쓴 QR 기록도 흐리게 보여 줌 (고칠 수는 있음)
 
@@ -49,6 +51,20 @@ function buildRows(ts: Timesheet, logs: AdminLog[]): Row[] {
 
 const sum = (items: PayrollItem[]) => items.reduce((s, i) => s + i.amount, 0)
 
+// 폰 화면이면 사람별이 기본 (날짜별 표는 옆으로 길어서)
+const NARROW = '(max-width: 767px)'
+function useNarrow() {
+  return useSyncExternalStore(
+    (cb) => {
+      const m = window.matchMedia(NARROW)
+      m.addEventListener('change', cb)
+      return () => m.removeEventListener('change', cb)
+    },
+    () => window.matchMedia(NARROW).matches,
+    () => false
+  )
+}
+
 export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, today }: {
   ts: Timesheet
   logs: AdminLog[] // 이 달 QR 기록 (모든 직원)
@@ -59,6 +75,13 @@ export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, toda
   const router = useRouter()
   const rows = buildRows(ts, logs)
   const [open, setOpen] = useState<number | null | undefined>(undefined)
+  const narrow = useNarrow()
+  const [picked, setPicked] = useState<'date' | 'person' | null>(null)
+  const mode = picked ?? (narrow ? 'person' : 'date')
+  const gridStaff = rows.filter((r) => r.id != null).map((r) => ({ id: r.id as number, name: r.name }))
+  const gridTotals = Object.fromEntries(
+    rows.filter((r) => r.id != null).map((r) => [r.id, { minutes: r.weekdayMin + r.sundayMin, pay: r.pay + sum(r.items) }])
+  )
   const [msg, setMsg] = useState<string | null>(null)
   const missing = openLogs.filter((l) => l.work_date < today)
   const prevMonth = ts.month === 1 ? 12 : ts.month - 1
@@ -90,9 +113,23 @@ export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, toda
       <div className="bg-white rounded-xl border border-gray-100">
         <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-gray-800">직원별 {ts.month}월</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-semibold text-gray-800">직원별 {ts.month}월</p>
+              <div className="flex gap-0.5 rounded-lg bg-gray-100 p-0.5">
+                {(['date', 'person'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setPicked(m)}
+                    className={`text-xs px-2.5 py-1 rounded-md ${mode === m ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500'}`}
+                  >
+                    {m === 'date' ? '날짜별' : '사람별'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
-              이름을 누르면 날짜별 출퇴근과 고정급·주휴수당 넣기가 열려요 · 시급 평일 {ts.rates.weekday ? won(ts.rates.weekday) : '미등록'} · 주일 {ts.rates.sunday ? won(ts.rates.sunday) : '미등록'}
+              {mode === 'date' ? '종이 근무일지와 같은 모양 · ' : '이름을 누르면 날짜별 출퇴근과 고정급·주휴수당 넣기가 열려요 · '}
+              시급 평일 {ts.rates.weekday ? won(ts.rates.weekday) : '미등록'} · 주일 {ts.rates.sunday ? won(ts.rates.sunday) : '미등록'}
             </p>
             {msg && <p className="text-xs text-[#1a5c3a] mt-1">{msg}</p>}
           </div>
@@ -101,7 +138,9 @@ export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, toda
           </button>
         </div>
 
-        {rows.length === 0 ? (
+        {mode === 'date' ? (
+          <StaffDateGrid ts={ts} logs={logs} staff={gridStaff} totals={gridTotals} today={today} />
+        ) : rows.length === 0 ? (
           <p className="text-xs text-gray-400 text-center py-10 [word-break:keep-all]">이 달 근무 기록이 없어요 · QR로 출퇴근하거나 종이 근무일지를 올리면 채워져요</p>
         ) : (
           <div className="overflow-x-auto">
@@ -148,7 +187,7 @@ export default function StaffMonthTable({ ts, logs, openLogs, staffOptions, toda
             </table>
           </div>
         )}
-        {!rows.some((r) => r.id == null) && (
+        {mode === 'person' && !rows.some((r) => r.id == null) && (
           <div className="border-t border-gray-50">
             <button onClick={() => setOpen(open === null ? undefined : null)} className="w-full text-left px-5 py-2.5 text-xs text-gray-400 hover:text-gray-700">
               {open === null ? '▾' : '▸'} 직원 지정 없는 항목 넣기 (예: 점장 고정급)
