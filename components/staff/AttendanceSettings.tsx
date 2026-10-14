@@ -74,8 +74,9 @@ function FixedSalary({ history }: { history: FixedSalaryEntry[] }) {
   const current = history.at(-1)
   const [label, setLabel] = useState(current?.label ?? '점장 고정급')
   const [amount, setAmount] = useState(current ? String(current.amount) : '')
+  const [from, setFrom] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()).slice(0, 7))
   const [saving, setSaving] = useState(false)
-  const changed = !current || label.trim() !== current.label || Number(amount.replace(/,/g, '')) !== current.amount
+  const changed = !current || label.trim() !== current.label || Number(amount.replace(/,/g, '')) !== current.amount || !history.some((h) => h.from === from)
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -83,7 +84,7 @@ function FixedSalary({ history }: { history: FixedSalaryEntry[] }) {
     await fetch('/api/attendance/fixed-salary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label, amount }),
+      body: JSON.stringify({ label, amount, from }),
     })
     setSaving(false)
     router.refresh()
@@ -99,12 +100,13 @@ function FixedSalary({ history }: { history: FixedSalaryEntry[] }) {
           </span>
         </p>
         <p className="text-xs text-gray-400 mt-0.5 [word-break:keep-all]">
-          점장처럼 매달 같은 금액을 받는 고정급이에요. 모든 달 인건비와 근무일지 엑셀에 자동으로 들어가요. 금액을 바꾸면 이번 달부터 적용되고 지난달은 그대로예요.
-          {history.length > 1 && ` 바뀐 기록: ${history.map((h) => `${h.from === '2000-01' ? '처음' : h.from}부터 ${h.amount.toLocaleString('ko-KR')}원`).join(' → ')}`}
+          점장처럼 매달 같은 금액을 받는 고정급이에요. 적용 시작 달부터 인건비와 근무일지 엑셀에 자동으로 들어가요 (그 달에 근무일지로 들어온 고정급이 있으면 그걸 써요). 금액을 바꾸면 고른 달부터 새 금액이고, 그 전 달은 그대로예요.
+          {history.length > 0 && ` 기록: ${history.map((h) => `${h.from}부터 ${h.amount.toLocaleString('ko-KR')}원`).join(' → ')}`}
         </p>
       </div>
       <div className="flex items-center gap-2">
         <input id="fixed-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="이름 (예: 점장 고정급)" required className={`${INPUT} w-32`} />
+        <input id="fixed-from" type="month" value={from} onChange={(e) => setFrom(e.target.value)} required className={INPUT} aria-label="적용 시작 달" />
         <input id="fixed-amount" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="금액" inputMode="numeric" required className={`${INPUT} w-28`} />
         <button type="submit" disabled={saving || !changed} className="text-xs px-3 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-40">
           저장
