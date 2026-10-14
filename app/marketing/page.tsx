@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import MarketingComposer from '@/components/marketing/MarketingComposer'
 import PostGroup from '@/components/marketing/PostGroup'
@@ -20,7 +21,7 @@ export default async function MarketingPage() {
       <PageTabs group="operations" />
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">
-          마케팅 <Link href="/inbox" className="ml-1 text-xs font-normal text-gray-400 hover:text-[#1a5c3a]">← 사무실</Link>
+          마케팅<GuideLink id="marketing" /> <Link href="/inbox" className="ml-1 text-xs font-normal text-gray-400 hover:text-[#1a5c3a]">← 사무실</Link>
         </h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">
           {drafts > 0 ? `확인할 초안 ${drafts}건` : 'AI가 쓴 초안을 읽고 고쳐서 승인한 뒤 직접 올려요'}

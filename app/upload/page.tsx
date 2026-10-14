@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import MonthFilter from '@/components/ui/MonthFilter'
 import UploadSection from '@/components/upload/UploadSection'
@@ -64,7 +65,7 @@ export default async function UploadPage({ searchParams }: PageProps) {
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <PageTabs group="data" />
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">데이터 넣기</h1>
+        <h1 className="text-xl font-bold text-gray-900">데이터 넣기<GuideLink id="data" /></h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">받은 파일을 끌어다 놓으면 종류를 알아보고 바로 저장해요</p>
       </div>
 

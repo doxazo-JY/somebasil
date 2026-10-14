@@ -3,9 +3,12 @@ import { createServerClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetchAll'
 import { kstDate } from '@/lib/attendance/tokens'
 import { getShiftsBetween } from '@/lib/supabase/queries/attendance-admin'
+import { guideAsText, guideForPath } from '@/lib/guide'
 import { recordRun, runToolChat, type AiTool } from '../client'
 
 // 비서 AI — 점장의 자연어 질문에 데이터를 직접 조회해서 답함 (조회 전용 도구만)
+//   사이트 사용법("시급 어디서 바꿔?")은 site_guide 도구 = lib/guide.ts (가이드 화면과 같은 내용)
+//   오른쪽 아래 버튼으로 물으면 지금 보고 있는 화면 주소(page)를 같이 받아서 "이 화면"을 알아들음
 // 직원 이름은 AI에 보내지 않음: 질문·도구 결과의 이름을 [직원N]으로 바꿔 보내고, 답에서 다시 이름으로 되돌림
 
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('YYYY-MM-DD (한국 날짜)')
@@ -70,6 +73,12 @@ class NameMask {
 
 function buildTools(mask: NameMask): AiTool[] {
   return [
+    {
+      name: 'site_guide',
+      description: '이 관리 사이트의 화면별 안내 (어느 화면에 무엇이 있는지, 설정·버튼이 어디 있는지, 자주 하는 일 하는 법). "어디서 ~해?", "~하려면 어떻게 해?", "이 화면 뭐야?" 같은 사용법 질문에 사용',
+      schema: z.object({}),
+      run: async () => guideAsText(),
+    },
     {
       name: 'data_coverage',
       description: '각 데이터가 언제부터 언제까지 들어와 있는지 확인. 기간이 데이터 밖이면 답하기 전에 먼저 확인',
@@ -247,7 +256,8 @@ function buildTools(mask: NameMask): AiTool[] {
   ]
 }
 
-function systemPrompt(today: string) {
+function systemPrompt(today: string, page?: string) {
+  const here = page ? guideForPath(page) : null
   return `당신은 카페 "썸바실"의 비서 AI입니다. 점장의 질문에 도구로 데이터를 조회해서 답합니다.
 
 오늘: ${today} (${WEEKDAY[weekdayOf(today)]}요일, 한국 날짜)
@@ -262,10 +272,17 @@ function systemPrompt(today: string) {
 - 데이터가 없거나 기간이 업로드 범위 밖이면 그렇다고 말하고, 무엇을 업로드하면 되는지 알려 줍니다.
 - 직원은 [직원N] 형태로만 보입니다. 답에도 그대로 [직원N]으로 씁니다.
 - 데이터를 바꾸는 일(입력·수정·삭제)은 할 수 없습니다. 요청받으면 어느 화면에서 하면 되는지 안내합니다.
-- 카페 운영 질문이 아니면 정중히 범위를 안내합니다.`
+- 카페 운영 질문이 아니면 정중히 범위를 안내합니다.
+
+사이트 사용법 질문:
+- "어디서 ~해?", "~하려면?", "이 화면 뭐야?"는 site_guide 도구로 확인한 내용만 답합니다. 기억으로 추측하지 않습니다.
+- 메뉴 경로를 "운영 > 직원 > 직원·설정 탭"처럼 쓰고, 마지막에 바로 가는 주소를 한 줄로 붙입니다 (예: 바로 가기: /staff?view=settings · 가이드: /guide#staff). 주소는 site_guide에 나온 것만 씁니다.
+- 사용법 답에는 "기준:" 줄을 쓰지 않습니다.${here ? `
+
+점장이 지금 보고 있는 화면: ${here.title} (${page}). "이 화면", "여기", "이 숫자"는 이 화면을 말합니다.` : ''}`
 }
 
-export async function askAssistant(question: string, history: { q: string; a: string }[] = []) {
+export async function askAssistant(question: string, history: { q: string; a: string }[] = [], page?: string) {
   const supabase = createServerClient()
   const { data: staff } = await supabase.from('staff').select('name')
   const mask = new NameMask((staff ?? []).map((s) => s.name as string))
@@ -279,7 +296,7 @@ export async function askAssistant(question: string, history: { q: string; a: st
       { role: 'user' as const, content: mask.mask(question) },
     ]
     const { text, toolsUsed, model, usage } = await runToolChat({
-      system: systemPrompt(kstDate(new Date())),
+      system: systemPrompt(kstDate(new Date()), page),
       turns,
       tools: buildTools(mask),
     })

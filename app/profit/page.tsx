@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import YearFilter from '@/components/ui/YearFilter'
 import ProfitStatCards from '@/components/profit/ProfitStatCards'
@@ -91,7 +92,7 @@ export default async function ProfitPage({ searchParams }: PageProps) {
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">이익 — 흑자가 되려면?</h1>
+          <h1 className="text-xl font-bold text-gray-900">이익 — 흑자가 되려면?<GuideLink id="profit" /></h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {year}년 연간 손익 · 적자 원인 · 흑자 전환 전략
           </p>

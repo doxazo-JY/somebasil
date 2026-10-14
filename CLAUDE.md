@@ -50,6 +50,12 @@
 - `/clock` — 직원용 QR 출퇴근 (로그인 없음, 사이드바 없음)
 - 예전 주소 `/diagnosis` `/recipes` `/settings`는 새 위치로 redirect (업무함 옛 링크 유지)
 
+## 가이드 · 비서 채팅 (10/16)
+- **가이드 내용은 `lib/guide.ts` 한 곳** — `/guide` 화면(사이드바 아래 "가이드", 폰은 상단 오른쪽)과 비서 AI `site_guide` 도구가 같이 씀
+- ⚠️ **화면·탭·버튼 이름이나 위치를 바꾸면 `lib/guide.ts`도 같이 고칠 것** (안 고치면 비서가 옛 위치를 안내함)
+- 각 화면 제목 옆 `?` = `components/ui/GuideLink` → `/guide#id`
+- 오른쪽 아래 썸바실 로고 버튼 = `components/ui/FloatingAssistant` (루트 layout, /clock 제외). 열 때 `GET /api/ai/ask`로 최근 대화, 질문에 지금 화면 주소(page) 같이 보냄 → "이 화면" 이해. 답 속 화면 주소는 링크로
+
 ## 사이드바 (3개 그룹) + PageTabs (그룹 내)
 - 사이드바: 운영 / 분석 / 데이터 (PageTabs 그룹 키 operations / analysis / data)
 - 페이지 상단 PageTabs로 그룹 내 이동

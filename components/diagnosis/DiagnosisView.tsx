@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import BreakEvenCards from '@/components/diagnosis/BreakEvenCards'
 import LeverTable from '@/components/diagnosis/LeverTable'
 import ProfitTargetTable from '@/components/diagnosis/ProfitTargetTable'
@@ -39,7 +40,7 @@ export default async function DiagnosisView() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">흑자 조건 — 하루 몇 명이 와야 할까?</h1>
+        <h1 className="text-xl font-bold text-gray-900">흑자 조건 — 하루 몇 명이 와야 할까?<GuideLink id="profit" /></h1>
         <p className="text-sm text-gray-400 mt-0.5">
           운영 {months.length}개월 데이터 기준 손익분기 · 고객 수 × 객단가 · 목표 이익
         </p>

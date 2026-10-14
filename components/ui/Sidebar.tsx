@@ -53,14 +53,25 @@ export default function Sidebar() {
             </Link>
           ))}
         </nav>
-        <div className="px-6 py-4 border-t border-gray-100">
-          <p className="text-xs text-gray-400">관리자</p>
+        {/* 가이드 — 일하는 묶음이 아니라 도움말이라 아래쪽에 따로 */}
+        <div className="px-3 py-3 border-t border-gray-100">
+          <Link
+            href="/guide"
+            className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
+              pathname === '/guide' ? 'bg-[#1a5c3a] text-white' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            가이드
+          </Link>
         </div>
       </aside>
 
       {/* ── 모바일 상단 헤더 ── */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 flex items-center px-4 h-12">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 flex items-center justify-between px-4 h-12">
         <span className="text-base font-bold tracking-tight text-gray-900">썸바실</span>
+        <Link href="/guide" className={`text-xs ${pathname === '/guide' ? 'text-[#1a5c3a] font-semibold' : 'text-gray-400'}`}>
+          가이드
+        </Link>
       </header>
 
       {/* ── 모바일 하단 탭 바 ── */}

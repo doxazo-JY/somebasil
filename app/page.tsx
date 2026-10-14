@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import MonthFilter from '@/components/ui/MonthFilter'
 import StatCard from '@/components/ui/StatCard'
@@ -147,7 +148,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">대시보드</h1>
+          <h1 className="text-xl font-bold text-gray-900">대시보드<GuideLink id="dashboard" /></h1>
           <p className="text-sm text-gray-400 mt-0.5">카페 썸바실 — 한눈에 보기</p>
         </div>
         <MonthFilter year={year} month={month} />

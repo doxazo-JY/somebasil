@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 
 type Turn = { q: string; a: string | null; error?: string }
 
@@ -10,13 +11,34 @@ const EXAMPLES = [
   '이번 달 레몬 마들렌 몇 개 팔렸어?',
   '9월 재료비 얼마 나갔어?',
   '이번 달 알바생별 근무시간 알려 줘',
+  '시급은 어디서 바꿔?',
 ]
 
+// 답 속 화면 주소(/staff?view=settings, /guide#staff …)를 누를 수 있는 링크로
+const PATH_RE = /(\/(?:guide|staff|weekly|inbox|marketing|profit|expenses|menu|upload)(?:[?#][\w=&#-]*)?)/g
+function Linkified({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(PATH_RE).map((part, i) =>
+        i % 2 === 1 ? (
+          <Link key={i} href={part} className="text-[#1a5c3a] underline underline-offset-2 break-all">
+            {part}
+          </Link>
+        ) : (
+          <Fragment key={i}>{part}</Fragment>
+        )
+      )}
+    </>
+  )
+}
+
 // 비서 AI 대화창 — 질문 → 데이터 조회 → 답 (최근 대화 이어서 묻기 가능)
-export default function AssistantChat({ initial, disabledReason, onBusyChange }: {
+export default function AssistantChat({ initial, disabledReason, onBusyChange, page, compact = false }: {
   initial: { q: string; a: string }[]
   disabledReason: string | null
   onBusyChange?: (busy: boolean) => void // 사무실 그림에서 비서가 타이핑하도록
+  page?: string // 지금 보는 화면 주소 (오른쪽 아래 채팅창에서 물을 때)
+  compact?: boolean // 오른쪽 아래 작은 창 — 창 높이에 맞춰 늘어남
 }) {
   const [turns, setTurns] = useState<Turn[]>(initial)
   const [question, setQuestion] = useState('')
@@ -38,7 +60,7 @@ export default function AssistantChat({ initial, disabledReason, onBusyChange }:
     const res = await fetch('/api/ai/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, history }),
+      body: JSON.stringify({ question: q, history, page }),
     }).catch(() => null)
     const data = res ? await res.json().catch(() => ({})) : {}
     setBusy(false)
@@ -51,8 +73,8 @@ export default function AssistantChat({ initial, disabledReason, onBusyChange }:
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 flex flex-col">
-      <div className="px-5 py-4 space-y-4 max-h-[560px] overflow-y-auto">
+    <div className={`bg-white flex flex-col ${compact ? 'h-full min-h-0' : 'rounded-xl border border-gray-100'}`}>
+      <div className={`px-5 py-4 space-y-4 overflow-y-auto ${compact ? 'flex-1 min-h-0' : 'max-h-[560px]'}`}>
         {turns.length === 0 && (
           <div className="space-y-2">
             <p className="text-sm text-gray-500 [word-break:keep-all]">매출·메뉴·지출·근무시간 기록을 직접 찾아보고 답해요. 이렇게 물어보세요.</p>
@@ -77,7 +99,7 @@ export default function AssistantChat({ initial, disabledReason, onBusyChange }:
             </div>
             <div className="flex">
               {t.a ? (
-                <p className="max-w-[90%] rounded-2xl rounded-bl-sm bg-gray-50 text-gray-800 text-sm px-3.5 py-2.5 whitespace-pre-line leading-relaxed [word-break:keep-all]">{t.a}</p>
+                <p className="max-w-[90%] rounded-2xl rounded-bl-sm bg-gray-50 text-gray-800 text-sm px-3.5 py-2.5 whitespace-pre-line leading-relaxed [word-break:keep-all]"><Linkified text={t.a} /></p>
               ) : t.error ? (
                 <p className="text-xs text-red-500 [word-break:keep-all]">{t.error}</p>
               ) : (

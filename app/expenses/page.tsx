@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import MonthFilter from '@/components/ui/MonthFilter'
 import PageTabs from '@/components/ui/PageTabs'
 import CostRatioCards from '@/components/expenses/CostRatioCards'
@@ -92,7 +93,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">지출 — 어디서 돈이 새고 있나?</h1>
+          <h1 className="text-xl font-bold text-gray-900">지출 — 어디서 돈이 새고 있나?<GuideLink id="expenses" /></h1>
           <p className="text-sm text-gray-400 mt-0.5">비용 구조 분석 · 매출 대비 비율</p>
         </div>
         <MonthFilter year={year} month={month} />

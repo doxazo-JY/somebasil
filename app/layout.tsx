@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import Sidebar from "@/components/ui/Sidebar";
+import FloatingAssistant from "@/components/ui/FloatingAssistant";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -26,6 +27,10 @@ export default function RootLayout({
           <Sidebar />
         </Suspense>
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">{children}</main>
+        {/* 오른쪽 아래 비서 AI 버튼 (출퇴근 화면 제외) */}
+        <Suspense fallback={null}>
+          <FloatingAssistant />
+        </Suspense>
       </body>
     </html>
   );

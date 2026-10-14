@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import OfficeView from '@/components/office/OfficeView'
 import { getAssistantHistory, getInbox, getRecentRuns } from '@/lib/supabase/queries/ai'
@@ -15,7 +16,7 @@ export default async function OfficePage() {
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <PageTabs group="operations" />
       <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-900">AI 사무실</h1>
+        <h1 className="text-xl font-bold text-gray-900">AI 사무실<GuideLink id="office" /></h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">
           {open.length > 0 ? `챙길 일 ${open.length}건 · 책상을 누르면 그 AI가 올린 것만 보여요` : '매일 아침 8시에 AI 업무팀이 점검해요'}
         </p>

@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import CostTable from '@/components/recipes/CostTable'
 import IngredientRecoveryTable from '@/components/recipes/IngredientRecoveryTable'
 import RecipesTabs from '@/components/recipes/RecipesTabs'
@@ -35,7 +36,7 @@ export default async function RecipesView() {
   return (
     <div>
       <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-900">메뉴 원가</h1>
+        <h1 className="text-xl font-bold text-gray-900">메뉴 원가<GuideLink id="menu" /></h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">
           메뉴별 원가/마진/원가율 + 재료 봉지 회수율 — 부분 입력 시 등록된 메뉴만 계산
         </p>

@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import SubTabs from '@/components/ui/SubTabs'
 import RecipesView from '@/components/recipes/RecipesView'
@@ -109,7 +110,7 @@ export default async function MenuAnalysisPage({ searchParams }: PageProps) {
       <PageTabs group="analysis" />
       <SubTabs items={VIEWS} />
       <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-900">메뉴 분석</h1>
+        <h1 className="text-xl font-bold text-gray-900">메뉴 분석<GuideLink id="menu" /></h1>
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">
           요일·시간 패턴 / 죽은 메뉴 — 메뉴판 정리·발주·스케줄 의사결정용
         </p>

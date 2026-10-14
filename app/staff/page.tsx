@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import SubTabs from '@/components/ui/SubTabs'
 import MonthFilter from '@/components/ui/MonthFilter'
@@ -72,7 +73,7 @@ export default async function StaffPage({ searchParams }: PageProps) {
     <div className="px-4 pt-16 pb-6 md:px-16 md:pt-8 w-full">
       <PageTabs group="operations" />
       <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-900">직원</h1>
+        <h1 className="text-xl font-bold text-gray-900">직원<GuideLink id="staff" /></h1>
         <p className="text-sm text-gray-400 mt-0.5">
           {working.length > 0 ? `지금 근무 중: ${working.map((l) => l.staff_name).join(', ')}` : '지금 근무 중인 직원 없음'}
         </p>

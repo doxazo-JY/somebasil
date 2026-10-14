@@ -1,3 +1,4 @@
+import GuideLink from '@/components/ui/GuideLink'
 import PageTabs from '@/components/ui/PageTabs'
 import WeekSelector from '@/components/weekly/WeekSelector'
 import WeeklyInsightBanner from '@/components/weekly/WeeklyInsightBanner'
@@ -121,7 +122,7 @@ export default async function WeeklyPage({ searchParams }: PageProps) {
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">주간 현황</h1>
+          <h1 className="text-xl font-bold text-gray-900">주간 현황<GuideLink id="weekly" /></h1>
           <p className="text-sm text-gray-400 mt-0.5">
             매주 목요일 주간보고용 · 기본값 = 지난 주(월~일)
           </p>
