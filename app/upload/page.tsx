@@ -68,7 +68,7 @@ export default async function UploadPage({ searchParams }: PageProps) {
         <p className="text-sm text-gray-400 mt-0.5 [word-break:keep-all]">받은 파일을 끌어다 놓으면 종류를 알아보고 바로 저장해요</p>
       </div>
 
-      <div className="mb-10 max-w-3xl">
+      <div className="mb-10">
         <UploadSection coverage={coverage} weeklyDone={weeklyDone} />
       </div>
 
