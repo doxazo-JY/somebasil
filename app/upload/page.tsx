@@ -43,7 +43,7 @@ export default async function UploadPage({ searchParams }: PageProps) {
   else if (fix === 'adjust') fixView = <ManualAdjustments items={await getManualAdjustments()} />
   else if (fix === 'basis')
     fixView = (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6">
         <IncomeBasisToggle initialValue={await getIncomeBasis()} />
         <RecalcButton />
       </div>

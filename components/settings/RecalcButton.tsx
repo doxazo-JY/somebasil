@@ -36,9 +36,7 @@ export default function RecalcButton() {
         <div className="flex-1">
           <p className="text-sm font-semibold text-gray-800">월별 요약 재계산</p>
           <p className="text-xs text-gray-400 mt-1 leading-relaxed [word-break:keep-all]">
-            대시보드/지출 페이지의 합계가 이상할 때 누르세요. 모든 월의 매출·지출·이익을
-            <code className="text-gray-500"> daily_sales / monthly_expenses / manual_adjustments</code>
-            기반으로 다시 계산합니다.
+            대시보드·지출 화면의 합계가 이상할 때 누르세요. 올려 둔 매출·통장 지출·수동 조정으로 모든 달의 매출·지출·이익을 다시 계산해요.
           </p>
         </div>
         <button
