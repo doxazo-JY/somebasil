@@ -95,7 +95,7 @@ export type MenuSaveResult = { added: number; renamed: number; deactivated: numb
 // POS 메뉴 목록 저장 — 메뉴 목록은 4/25 이후 손으로 정리해 둔 상태라 그걸 지키면서 갱신
 //   이미 있는 메뉴: 이름·가격만 새 값. 사용 여부는 그대로 (파일이 "사용 N"이면 미사용으로)
 //     단 미사용이었는데 새 이름으로 최근 60일 판매가 있고, 그 판매가 다른 메뉴에 연결돼 있지 않으면 사용으로 (POS가 그 ID로 팔고 있음)
-//   새 메뉴: 파일이 사용 Y면 사용. 단 이름이 같은 사용 중 메뉴가 이미 있으면 미사용 (같은 메뉴가 두 벌 — POS 화면이 둘)
+//   새 메뉴: 파일이 사용 Y면 사용. 단 이름이 같은 사용 중 메뉴가 이미 있으면 미사용 (같은 메뉴가 두 벌 — POS 화면이 둘), 가격 0 이하(옵션)도 미사용
 //   파일에 없는 메뉴: POS에서 지운 것 → 미사용
 //   이름이 바뀐 메뉴: 옛 이름으로 팔린 기록이 있으면 옛 이름을 수동 매칭으로 남김 + 레시피 키를 새 이름으로 옮김
 export async function saveMenu(rows: MenuRow[]): Promise<MenuSaveResult> {
@@ -111,7 +111,8 @@ export async function saveMenu(rows: MenuRow[]): Promise<MenuSaveResult> {
 
   // 최근 60일 판매 이름 (키)
   const since = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10)
-  const recent = await fetchAllRows<{ product_name: string | null }>((a, b) => supabase.from('daily_sales').select('product_name').eq('source', 'pos').gte('date', since).range(a, b))
+  // etc(샷추가·디카페인 변경·텀블러 할인 같은 옵션·할인 줄)는 메뉴가 아니라서 뺌
+  const recent = await fetchAllRows<{ product_name: string | null }>((a, b) => supabase.from('daily_sales').select('product_name').eq('source', 'pos').neq('category', 'etc').gte('date', since).range(a, b))
   const recentNames = [...new Set(recent.map((r) => r.product_name).filter((n): n is string => !!n))]
   const { data: aliasNow } = await supabase.from('product_aliases').select('product_id, pos_name')
 
@@ -138,7 +139,8 @@ export async function saveMenu(rows: MenuRow[]): Promise<MenuSaveResult> {
       if (old.name !== r.name) renames.push({ id: r.id, from: old.name as string, to: r.name, active: on })
     } else {
       const key = stripVariantSuffix(r.name)
-      const on = r.is_active && !activeKeys.has(key)
+      // 가격 0 이하 = 옵션·할인 항목 (덜달게 등) → 미사용
+      const on = r.is_active && r.price > 0 && !activeKeys.has(key)
       if (on) activeKeys.add(key)
       payload.push({ id: r.id, name: r.name, price: r.price, is_active: on, updated_at: now })
       added++
