@@ -363,12 +363,12 @@ export async function getAllPosNamesWithStatus(): Promise<PosNameWithStatus[]> {
   const supabase = createServerClient()
 
   // 1) 마스터 이름 사전: stripped → 마스터 표시이름
+  // 미사용 메뉴도 포함 — 단종·시즌 메뉴의 예전 판매 이름이 "(미사용)" 메뉴에 연결돼 보이게
   const { data: products } = await supabase
     .from('products')
-    .select('id, name')
-    .eq('is_active', true)
+    .select('id, name, is_active')
   const masterById = new Map<string, string>()
-  for (const p of products ?? []) masterById.set(p.id, p.name)
+  for (const p of products ?? []) masterById.set(p.id, p.is_active ? p.name : `${p.name} (미사용)`)
 
   // 2) alias 사전: pos_name (raw) → 매칭된 마스터 이름
   const aliasByPosName = new Map<string, string>()
@@ -384,7 +384,7 @@ export async function getAllPosNamesWithStatus(): Promise<PosNameWithStatus[]> {
     // 테이블 없으면 무시
   }
   // 자동 매칭 (사용 중 메뉴만) — 이름 같음 → 끝 "티"만 다름
-  const autoMatch = createMenuMatcher((products ?? []).map((p) => ({ ...p, is_active: true })), [])
+  const autoMatch = createMenuMatcher(products ?? [], [])
 
   // 3) POS sales 전체 집계
   const rows = await fetchAllRows<{

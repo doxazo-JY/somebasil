@@ -136,7 +136,7 @@
 ### product_aliases — POS 이름 ↔ 마스터 수동 매핑
 - id, product_id (→products), pos_name (UNIQUE), created_at
 - 자동 매칭으로 안 되는 케이스용 (10/16 정리 후 13개 — 블루오브런던·핫초코·핸드드립(게이샤)·애플시나몬티 + 메뉴 파일이 이름 바뀐 메뉴의 옛 판매 이름을 자동 등록한 것)
-- 매칭 순서 = `createMenuMatcher()` (`lib/menu-utils.ts`): alias → `stripVariantSuffix` 같음 (HOT/ICE·(ICE Only)·공백·괄호 무시) → 끝 "티"만 다름 (`looseMenuKey`, 사용 메뉴 하나에만 걸릴 때). 자동은 사용 중 메뉴만. `[단품]`·`(5개)`는 빼지 않음 (드립백5개↔10개 합쳐짐 방지)
+- 매칭 순서 = `createMenuMatcher()` (`lib/menu-utils.ts`): alias → `stripVariantSuffix` 같음 (HOT/ICE·(ICE Only)·공백·괄호 무시) → 끝 "티"만 다름 (`looseMenuKey`, 사용 메뉴 하나에만 걸릴 때) → 이름 같은 미사용 메뉴 (단종·시즌 메뉴의 예전 판매 기록 — 지우지 않고 남김). 사용 메뉴가 항상 먼저. 10/16 기준 연결 안 되는 POS 이름 5개 = 메뉴 목록에 없는 시즌 메뉴(수박·토마토주스, 긴 이름 구움과자세트). 미니 티라미수 ≠ 말차 티라미수, 순수 말차 세트 ≠ 순수 말차 (다른 메뉴) `[단품]`·`(5개)`는 빼지 않음 (드립백5개↔10개 합쳐짐 방지)
 
 ### memos — 월별 메모
 - id, year, month, content, created_at, updated_at

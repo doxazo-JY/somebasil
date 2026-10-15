@@ -55,14 +55,20 @@ export function looseMenuKey(name: string): string {
 export type MatchProduct = { id: string; name: string; is_active: boolean }
 export type MatchAlias = { product_id: string; pos_name: string }
 
-// POS 판매 이름 → 메뉴 마스터 id. 순서: 수동 매칭(alias) → 이름 같음 → 끝 "티"만 다름
-// 자동 매칭은 사용 중인 메뉴만. 2차 키가 메뉴 두 개에 걸리면 매칭 안 함 (잘못 붙느니 수동으로)
+// POS 판매 이름 → 메뉴 마스터 id. 순서: 수동 매칭(alias) → 이름 같음 → 끝 "티"만 다름 → 이름 같은 미사용 메뉴
+// 마지막은 단종·시즌 메뉴(예전 판매 기록)용 — 사용 중 메뉴에 먼저 붙고, 없을 때만 미사용 메뉴로
+// 2차 키가 메뉴 두 개에 걸리면 매칭 안 함 (잘못 붙느니 수동으로)
 export function createMenuMatcher(products: MatchProduct[], aliases: MatchAlias[]) {
   const alias = new Map(aliases.map((a) => [a.pos_name, a.product_id]))
   const exact = new Map<string, string>()
   const loose = new Map<string, string | null>()
+  const retired = new Map<string, string>()
   for (const p of products) {
-    if (!p.is_active) continue
+    if (!p.is_active) {
+      const k = stripVariantSuffix(p.name)
+      if (!retired.has(k)) retired.set(k, p.id)
+      continue
+    }
     const k = stripVariantSuffix(p.name)
     if (!exact.has(k)) exact.set(k, p.id)
     const l = looseMenuKey(p.name)
@@ -74,7 +80,9 @@ export function createMenuMatcher(products: MatchProduct[], aliases: MatchAlias[
     const e = exact.get(stripVariantSuffix(posName))
     if (e) return { productId: e, via: 'auto' }
     const l = loose.get(looseMenuKey(posName))
-    return l ? { productId: l, via: 'auto' } : null
+    if (l) return { productId: l, via: 'auto' }
+    const r = retired.get(stripVariantSuffix(posName))
+    return r ? { productId: r, via: 'auto' } : null
   }
 }
 
