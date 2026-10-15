@@ -40,8 +40,16 @@ const SYSTEM = `당신은 카페 "썸바실"의 경영 담당 AI입니다. 매�
 - 금액은 원 단위 데이터를 "38만원", "1,234,000원"처럼 읽기 쉽게 씁니다.
 - 데이터가 비어 있거나 업로드가 안 된 것으로 보이면(예: 지출 0원, hasExpenseData=false), 그것 자체를 항목으로 짚을 수 있습니다.
 - 날짜·요일은 한국 기준입니다. weekday는 0=일요일 ~ 6=토요일입니다.
+- 주를 부를 때는 "10/5~11주", "9/28~10/4주"처럼 날짜로 씁니다. "그전주", "전전주" 같은 말은 쓰지 않습니다 (언제인지 헷갈림).
 
 고르는 기준: 매출·이익에 영향이 큰 것, 추세가 바뀐 것(연속 하락·급증), 점장이 행동으로 바꿀 수 있는 것을 우선합니다. 세 항목은 서로 다른 내용이어야 합니다.`
+
+// "2026-10-05" ~ "2026-10-11" → "10/5~11주" (달이 바뀌면 "9/28~10/4주")
+function weekName(start: string, end: string) {
+  const [, sm, sd] = start.split('-').map(Number)
+  const [, em, ed] = end.split('-').map(Number)
+  return sm === em ? `${sm}/${sd}~${ed}주` : `${sm}/${sd}~${em}/${ed}주`
+}
 
 // 프롬프트용으로 주간 상세를 줄임
 function compactWeek(w: WeekDetail) {
@@ -73,16 +81,19 @@ export async function runBusinessAgent(trigger: RunTrigger) {
       getDiagnosisMonths(),
     ])
 
+    // 주 이름은 날짜로 ("10/5~11주") — '그전주' 같은 키 이름을 AI가 글에 그대로 쓰지 않게
+    const lastName = weekName(last.weekStart, last.weekEnd)
+    const prevName = weekName(prev.weekStart, prev.weekEnd)
     const data = {
-      분석대상주: compactWeek(lastDetail),
-      그전주: compactWeek(prevDetail),
+      [`분석하는 주 (${lastName})`]: compactWeek(lastDetail),
+      [`비교할 앞 주 (${prevName})`]: compactWeek(prevDetail),
       최근8주추이: trend.map((w) => ({ 주: w.label, 시작: w.weekStart, 매출: w.income, 지출: w.expense, 이익: w.profit, 지출데이터있음: w.hasExpenseData })),
       최근월비용구조: months.slice(-3),
     }
 
     const { output, model, usage } = await generateStructured({
       system: SYSTEM,
-      user: `지난주(${last.label}, ${last.weekStart} ~ ${last.weekEnd}) 데이터입니다. 이번 주 꼭 볼 것 3가지를 정리해 주세요.\n\n${JSON.stringify(data)}`,
+      user: `지난주(${lastName}) 데이터입니다. 앞 주(${prevName})와 비교할 때는 "${lastName}", "${prevName}"처럼 날짜로 부르세요. 이번 주 꼭 볼 것 3가지를 정리해 주세요.\n\n${JSON.stringify(data)}`,
       schema: OutputSchema,
       name: 'weekly_business_report',
     })

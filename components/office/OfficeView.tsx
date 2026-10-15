@@ -215,9 +215,62 @@ function AgentDetail({ agent, assistantHistory, last, runs, open, closed, config
       </div>
 
       {agent.plan && <PlanRequest running={running} disabled={blocked} onRun={(topic) => run('plan', topic)} />}
+      {agent.key === 'cost' && <CostNote disabled={blocked} />}
 
       <InboxList open={open} closed={closed} hideAgent emptyText={`${agent.name}가 올린 챙길 일이 없어요`} />
     </div>
+  )
+}
+
+// 원가 AI 직접 알려 주기 — 질문을 기다리지 않고 먼저 적기 → 아래 업무함에 정리안이 올라옴 → [이대로 저장]
+function CostNote({ disabled }: { disabled: boolean }) {
+  const router = useRouter()
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function send() {
+    if (!text.trim() || busy) return
+    setBusy(true)
+    setError(null)
+    const res = await fetch('/api/ai/cost', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step: 'note', answer: text }),
+    }).catch(() => null)
+    const data = res ? await res.json().catch(() => ({})) : {}
+    setBusy(false)
+    if (!res?.ok) return setError(data.error ?? '보내지 못했어요. 다시 해 주세요.')
+    setText('')
+    router.refresh()
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        send()
+      }}
+      className="bg-white rounded-xl border border-gray-100 px-5 py-4 space-y-2"
+    >
+      <p className="text-sm font-semibold text-gray-900">직접 알려 주기</p>
+      <p className="text-xs text-gray-500 [word-break:keep-all]">질문을 기다리지 않고 먼저 적어도 돼요. 재료 가격 · 만드는 법 · 메뉴 레시피 중 하나씩 적으면 아래에 저장안이 올라와요. 확인하고 [이대로 저장]을 눌러야 저장돼요.</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={3}
+        maxLength={1000}
+        disabled={disabled || busy}
+        placeholder={'예: 바닐라시럽 배합 바뀌었어요 — 설탕 400g, 물 500ml, 바닐라빈 2개 넣으면 700ml 나와요\n예: 우유 1L 2,900원으로 올랐어요'}
+        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a] [word-break:keep-all]"
+      />
+      {error && <p className="text-xs text-red-500 [word-break:keep-all]">{error}</p>}
+      <div className="flex justify-end">
+        <button type="submit" disabled={busy || disabled || !text.trim()} className="text-xs px-4 py-1.5 rounded-lg bg-[#1a5c3a] text-white hover:bg-[#154d30] disabled:opacity-40 whitespace-nowrap">
+          {busy ? '정리하는 중… (20초 정도)' : '보내기'}
+        </button>
+      </div>
+    </form>
   )
 }
 

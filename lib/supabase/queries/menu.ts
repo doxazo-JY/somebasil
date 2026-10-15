@@ -1,6 +1,6 @@
 import { createServerClient } from '../server'
 import { fetchAllRows } from '../fetchAll'
-import { normalizeProductName, stripVariantSuffix } from '@/lib/menu-utils'
+import { createMenuMatcher, normalizeProductName, stripVariantSuffix } from '@/lib/menu-utils'
 
 // ─────────────────────────────────────────────
 // 공통 타입
@@ -227,13 +227,17 @@ export async function getDeadMenus(
     if (masterKey) aliasByPosName.set(a.pos_name, masterKey)
   }
 
-  // 5-2) 기간 내 판매량/매출 누적 — alias 우선, 없으면 자동 정규화 매칭
+  // 5-2) 기간 내 판매량/매출 누적 — alias 우선, 없으면 자동 매칭 (이름 같음 → 끝 "티"만 다름)
+  const match = useMaster ? createMenuMatcher(products!.map((p) => ({ ...p, is_active: true })), []) : null
   for (const r of periodRows) {
     if (!r.product_name) continue
     // alias 우선 (점장이 명시적으로 지정한 매핑)
     let masterKey = aliasByPosName.get(r.product_name)
-    // 폴백: 자동 정규화 매칭
-    if (!masterKey) masterKey = stripVariantSuffix(r.product_name)
+    // 폴백: 자동 매칭 → 그 마스터의 키, 마스터 없으면 이름 그대로
+    if (!masterKey) {
+      const m = match?.(r.product_name)
+      masterKey = (m && idToKey.get(m.productId)) || stripVariantSuffix(r.product_name)
+    }
     const u = universe.get(masterKey)
     if (!u) continue // 마스터에 없거나 'etc'로 필터된 항목
     u.quantity += r.quantity ?? 0
@@ -307,12 +311,7 @@ export async function getMasterProducts(): Promise<MasterProduct[]> {
     // alias 테이블 없으면 무시
   }
 
-  // 마스터 stripped key → product_id (활성 마스터만 자동 매칭 대상)
-  const strippedToProductId = new Map<string, string>()
-  for (const p of products ?? []) {
-    if (!p.is_active) continue
-    strippedToProductId.set(stripVariantSuffix(p.name), p.id)
-  }
+  const match = createMenuMatcher(products ?? [], [...aliasByPosName].map(([pos_name, product_id]) => ({ pos_name, product_id })))
 
   // POS distinct product_name 수집 (etc 제외)
   const posNames = new Set<string>()
@@ -328,21 +327,14 @@ export async function getMasterProducts(): Promise<MasterProduct[]> {
     if (r.product_name && r.category !== 'etc') posNames.add(r.product_name)
   }
 
-  // 각 POS 이름의 매칭 결정 — alias 우선, 없으면 자동 정규화
+  // 각 POS 이름의 매칭 결정 — alias 우선, 없으면 자동 (이름 같음 → 끝 "티"만 다름)
   const matchesByProduct = new Map<string, MasterMatch[]>()
   for (const posName of posNames) {
-    let productId: string | undefined
-    let via: 'alias' | 'auto' = 'auto'
-    if (aliasByPosName.has(posName)) {
-      productId = aliasByPosName.get(posName)
-      via = 'alias'
-    } else {
-      productId = strippedToProductId.get(stripVariantSuffix(posName))
-    }
-    if (!productId) continue
-    const list = matchesByProduct.get(productId) ?? []
-    list.push({ pos_name: posName, via })
-    matchesByProduct.set(productId, list)
+    const m = match(posName)
+    if (!m) continue
+    const list = matchesByProduct.get(m.productId) ?? []
+    list.push({ pos_name: posName, via: m.via })
+    matchesByProduct.set(m.productId, list)
   }
 
   return (products ?? []).map((p) => {
@@ -375,12 +367,8 @@ export async function getAllPosNamesWithStatus(): Promise<PosNameWithStatus[]> {
     .from('products')
     .select('id, name')
     .eq('is_active', true)
-  const masterByKey = new Map<string, string>()
   const masterById = new Map<string, string>()
-  for (const p of products ?? []) {
-    masterByKey.set(stripVariantSuffix(p.name), p.name)
-    masterById.set(p.id, p.name)
-  }
+  for (const p of products ?? []) masterById.set(p.id, p.name)
 
   // 2) alias 사전: pos_name (raw) → 매칭된 마스터 이름
   const aliasByPosName = new Map<string, string>()
@@ -395,6 +383,8 @@ export async function getAllPosNamesWithStatus(): Promise<PosNameWithStatus[]> {
   } catch {
     // 테이블 없으면 무시
   }
+  // 자동 매칭 (사용 중 메뉴만) — 이름 같음 → 끝 "티"만 다름
+  const autoMatch = createMenuMatcher((products ?? []).map((p) => ({ ...p, is_active: true })), [])
 
   // 3) POS sales 전체 집계
   const rows = await fetchAllRows<{
@@ -425,8 +415,8 @@ export async function getAllPosNamesWithStatus(): Promise<PosNameWithStatus[]> {
   const result: PosNameWithStatus[] = []
   for (const [pos_name, agg] of map.entries()) {
     const aliasMaster = aliasByPosName.get(pos_name)
-    const stripped = stripVariantSuffix(pos_name)
-    const masterName = masterByKey.get(stripped)
+    const auto = autoMatch(pos_name)
+    const masterName = auto ? masterById.get(auto.productId) : undefined
     let matchedMasterName: string | null = null
     let matchedVia: 'master' | 'alias' | null = null
     if (aliasMaster) {

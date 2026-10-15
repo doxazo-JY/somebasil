@@ -16,8 +16,8 @@ export const DRINK_CATEGORIES = new Set([
 ])
 
 // 핫/아이스 표기 패턴
-// - 괄호형: (HOT) / (ICE) / (H) / (I) / (핫) / (아이스)
-const PAREN_RE = /\s*\((?:HOT|ICE|H|I|핫|아이스)\)/gi
+// - 괄호형: (HOT) / (ICE) / (H) / (I) / (핫) / (아이스) / (ICE Only) / (Only Ice)
+const PAREN_RE = /\s*\((?:HOT|ICE|H|I|핫|아이스|ICE\s*Only|Only\s*Ice)\)/gi
 // - 분리형 단어: HOT / ICE / 핫 / 아이스 (단어 경계)
 const WORD_RE = /(?:^|\s)(?:HOT|ICE|핫|아이스)(?=\s|$)/gi
 
@@ -44,6 +44,38 @@ export function stripVariantSuffix(name: string): string {
     .replace(WORD_RE, ' ') // HOT ICE 단어 제거
     .replace(/[\s()\[\]{}.,·_/\\-]/g, '') // 공백·괄호·구두점 모두 제거
     .toLowerCase()
+}
+
+// 매칭 2차 키 — 끝의 "티"만 다른 이름 (도원결의 ↔ 도원결의티, TWG 캐모마일 ↔ TWG 캐모마일티)
+// 1차 키(stripVariantSuffix)로 못 찾을 때만 씀. [단품]·(5개) 같은 말은 빼지 않음 (드립백5개 ↔ 드립백10개가 합쳐지지 않게)
+export function looseMenuKey(name: string): string {
+  return stripVariantSuffix(name).replace(/티$/, '')
+}
+
+export type MatchProduct = { id: string; name: string; is_active: boolean }
+export type MatchAlias = { product_id: string; pos_name: string }
+
+// POS 판매 이름 → 메뉴 마스터 id. 순서: 수동 매칭(alias) → 이름 같음 → 끝 "티"만 다름
+// 자동 매칭은 사용 중인 메뉴만. 2차 키가 메뉴 두 개에 걸리면 매칭 안 함 (잘못 붙느니 수동으로)
+export function createMenuMatcher(products: MatchProduct[], aliases: MatchAlias[]) {
+  const alias = new Map(aliases.map((a) => [a.pos_name, a.product_id]))
+  const exact = new Map<string, string>()
+  const loose = new Map<string, string | null>()
+  for (const p of products) {
+    if (!p.is_active) continue
+    const k = stripVariantSuffix(p.name)
+    if (!exact.has(k)) exact.set(k, p.id)
+    const l = looseMenuKey(p.name)
+    loose.set(l, loose.has(l) && loose.get(l) !== p.id ? null : p.id)
+  }
+  return (posName: string): { productId: string; via: 'alias' | 'auto' } | null => {
+    const a = alias.get(posName)
+    if (a) return { productId: a, via: 'alias' }
+    const e = exact.get(stripVariantSuffix(posName))
+    if (e) return { productId: e, via: 'auto' }
+    const l = loose.get(looseMenuKey(posName))
+    return l ? { productId: l, via: 'auto' } : null
+  }
 }
 
 // 수량 단위 — 디저트는 "개", 음료/시즌/기타는 "잔"

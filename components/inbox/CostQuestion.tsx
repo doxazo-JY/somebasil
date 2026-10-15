@@ -13,7 +13,10 @@ export default function CostQuestion({ item }: { item: InboxItem }) {
   const [busy, setBusy] = useState<'propose' | 'apply' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string[] | null>(null)
+  // AI가 "조금 더 알려 주세요"로 되물은 말 — 답을 고치는 동안에도 계속 보이게 따로 둠
+  const [followUp, setFollowUp] = useState<string | null>(proposal && !proposal.ok ? proposal.follow_up : null)
   const example = (item.meta as { example?: string } | null)?.example
+  const fromNote = ((item.meta as { key?: string } | null)?.key ?? '').startsWith('note:') // 직접 알려 주기로 들어온 것
 
   async function call(step: 'propose' | 'apply') {
     setBusy(step)
@@ -26,7 +29,10 @@ export default function CostQuestion({ item }: { item: InboxItem }) {
     const data = res ? await res.json().catch(() => ({})) : {}
     setBusy(null)
     if (!res?.ok) return setError(data.error ?? '처리하지 못했어요. 다시 해 주세요.')
-    if (step === 'propose') setProposal(data.proposal)
+    if (step === 'propose') {
+      setProposal(data.proposal)
+      setFollowUp(data.proposal?.ok ? null : (data.proposal?.follow_up ?? null))
+    }
     else {
       setSaved(data.result ?? [])
       setTimeout(() => router.refresh(), 2500)
@@ -47,16 +53,22 @@ export default function CostQuestion({ item }: { item: InboxItem }) {
   return (
     <div className="space-y-2">
       <div className="rounded-lg border border-[#1a5c3a]/20 bg-[#f4f9f6] px-3 py-2">
-        <p className="text-[11px] font-semibold text-[#1a5c3a]">질문</p>
-        <p className="text-sm text-gray-800 [word-break:keep-all]">{item.action}</p>
+        <p className="text-[11px] font-semibold text-[#1a5c3a]">{fromNote ? '처음 적은 내용' : '질문'}</p>
+        <p className="text-sm text-gray-800 whitespace-pre-line [word-break:keep-all]">{item.action}</p>
       </div>
+      {followUp && !proposal && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="text-[11px] font-semibold text-amber-700">조금 더 알려 주세요</p>
+          <p className="text-sm text-amber-800 [word-break:keep-all]">{followUp}</p>
+        </div>
+      )}
       <textarea
         value={answer}
         onChange={(e) => {
           setAnswer(e.target.value)
           if (proposal) setProposal(null) // 답을 고치면 다시 정리
         }}
-        rows={2}
+        rows={3}
         maxLength={1000}
         placeholder={example ? `예: ${example.replace(/^예:\s*/, '')}` : '편하게 적어 주세요'}
         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1a5c3a] [word-break:keep-all]"

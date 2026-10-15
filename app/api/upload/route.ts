@@ -80,8 +80,17 @@ export async function POST(req: NextRequest) {
       }
     } else if (kind === 'menu') {
       const rows = parseMenu(wb)
-      await saveMenu(rows)
-      result = { kind, label: LABEL[kind], from: null, to: null, summary: `메뉴 ${rows.length}개 (판매 중 ${rows.filter((r) => r.is_active).length}개)` }
+      if (rows.length === 0) throw new UploadError('메뉴를 찾지 못했어요')
+      const saved = await saveMenu(rows)
+      const parts = [
+        `메뉴 ${rows.length}개`,
+        saved.added && `새 메뉴 ${saved.added}개`,
+        saved.renamed && `이름 바뀜 ${saved.renamed}개`,
+        saved.deactivated && `POS에서 빠져 미사용 ${saved.deactivated}개`,
+        saved.aliased && `옛 이름 ${saved.aliased}개 연결`,
+        saved.recipesMoved && `레시피 ${saved.recipesMoved}개 새 이름으로`,
+      ].filter(Boolean)
+      result = { kind, label: LABEL[kind], from: null, to: null, summary: parts.join(' · ') }
     } else if (kind === 'work_logs') {
       const parsed = parseWorklog(buffer)
       if (parsed.shifts.length === 0) throw new UploadError('근무 기록을 찾지 못했어요. 시트 이름이 "26년 8월"처럼 되어 있는지 확인해 주세요')

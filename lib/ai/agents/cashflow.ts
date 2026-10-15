@@ -32,7 +32,18 @@ const SYSTEM = `당신은 카페 "썸바실"의 자금 관리 담당 AI입니다
 - "반복지출"은 여러 달에 걸쳐 같은 상대에게 나간 돈입니다. 다음 달에도 비슷한 날짜에 나갈 가능성이 높습니다.
 - 위험이 없으면 alerts를 빈 배열로 둡니다. 억지로 만들지 않습니다.
 - 데이터가 오래됐으면(마지막 거래일이 2주 이상 전) 통장 거래 업로드가 필요하다는 것을 알림으로 올립니다.
-- 오늘 날짜를 기준으로 판단합니다.`
+- 오늘 날짜를 기준으로 판단합니다.
+- 잔고는 올라온 통장 파일의 마지막 거래 잔액이라, 그 뒤 거래는 반영되지 않습니다. 잔고를 쓸 때는 항상 기준을 붙입니다 (예: "10/13 오전 11시 통장 기준 잔고 78만원"). "현재 잔고"라고만 쓰지 않습니다.
+- 기준후지난날이 3일 이상이면 "그 뒤 거래가 반영되지 않았을 수 있어요"를 함께 쓰고, 통장 파일을 새로 올리면 정확해진다고 안내합니다.`
+
+// 거래 시각(UTC ISO) → "10/13 오전 11시" + 오늘까지 지난 날 (한국 시간)
+function balanceBasis(txTime: string, now: Date) {
+  const kst = new Date(new Date(txTime).getTime() + 9 * 3600000)
+  const h = kst.getUTCHours()
+  const label = `${kst.getUTCMonth() + 1}/${kst.getUTCDate()} ${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}시 통장 기준`
+  const days = Math.floor((new Date(kstDate(now)).getTime() - new Date(kst.toISOString().slice(0, 10)).getTime()) / 86400000)
+  return { label, days }
+}
 
 export async function runCashflowAgent(trigger: RunTrigger, now = new Date()) {
   return recordRun('cashflow', trigger, async (runId) => {
@@ -97,9 +108,11 @@ export async function runCashflowAgent(trigger: RunTrigger, now = new Date()) {
       .sort((a, b) => b.한달평균 - a.한달평균)
       .slice(0, 15)
 
+    // 잔고는 통장 파일의 마지막 거래 잔액 — 파일 이후 거래는 모름. 기준 시각을 한국 시간 글로 같이 줌
+    const basis = latest ? balanceBasis(latest.tx_time!, now) : null
     const data = {
       오늘: today,
-      현재잔고: latest ? { 금액: latest.balance_after, 기준거래시각: latest.tx_time } : '알 수 없음',
+      현재잔고: latest && basis ? { 금액: latest.balance_after, 기준: basis.label, 기준후지난날: basis.days } : '알 수 없음',
       마지막거래일: [...out, ...inc].map((t) => t.date).sort().at(-1) ?? '없음',
       최근90일합계: { 입금: inc.reduce((s, t) => s + t.amount, 0), 출금: out.reduce((s, t) => s + t.amount, 0) },
       일별입출금: [...daily.entries()].sort().map(([date, v]) => ({ date, ...v })),
